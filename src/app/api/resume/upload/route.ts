@@ -42,13 +42,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Failed to upload file to storage" }, { status: 500 });
     }
 
-    // Extract text with pdf-parse (v2 API - PDFParse class)
+    // Extract text with pdf-parse (v2 API)
     let rawText: string;
     try {
-      const { PDFParse } = await import("pdf-parse");
-      const parser = new PDFParse({ data: buffer });
-      const pdfResult = await parser.getText();
-      rawText = typeof pdfResult === "string" ? pdfResult : (pdfResult as { text: string }).text;
+      const pdf = await import("pdf-parse/lib/pdf.js");
+      const pdfParse = await import("pdf-parse");
+      const data = await pdfParse.default(buffer);
+      rawText = data.text || "";
     } catch (pdfError) {
       console.error("PDF parsing error:", pdfError);
       return NextResponse.json({ error: "Failed to extract text from PDF. Please ensure the file is a valid PDF." }, { status: 422 });
