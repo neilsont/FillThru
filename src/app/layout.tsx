@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { QueryProvider } from "@/providers/query-provider";
 import { ToastProvider } from "@/components/ui/toast";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -33,6 +34,7 @@ export default function RootLayout({
         <QueryProvider>
           <ToastProvider>{children}</ToastProvider>
         </QueryProvider>
+        <SpeedInsights />
       </body>
     </html>
   );
