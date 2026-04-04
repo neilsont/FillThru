@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
+import { OAuthButtons } from "./oauth-buttons";
 
 export function SignupForm() {
   const [email, setEmail] = useState("");
@@ -49,6 +50,17 @@ export function SignupForm() {
         <CardTitle className="text-xl">Create your account</CardTitle>
         <CardDescription>Get started with CareerLaunch in seconds</CardDescription>
       </CardHeader>
+      <CardContent className="pb-0 space-y-4">
+        <OAuthButtons next="/onboarding" />
+        <div className="relative">
+          <div className="absolute inset-0 flex items-center">
+            <span className="w-full border-t border-border/60" />
+          </div>
+          <div className="relative flex justify-center text-xs">
+            <span className="bg-card px-2 text-muted-foreground">or continue with email</span>
+          </div>
+        </div>
+      </CardContent>
       <form onSubmit={handleSubmit}>
         <CardContent className="space-y-4">
           {error && (
