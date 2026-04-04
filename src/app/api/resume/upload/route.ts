@@ -1,11 +1,13 @@
 import { createClient } from "@/lib/supabase/server";
 import { parseResumeText } from "@/lib/anthropic/resume-parser";
 import { NextResponse } from "next/server";
-import pdfParse from "pdf-parse";
-
 export const maxDuration = 60;
 
 async function extractTextFromPDF(buffer: Buffer): Promise<string> {
+  // pdf-parse is a CJS module — use require() so Turbopack skips static analysis
+  // and Vercel's file tracer includes it in the deployment bundle
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const pdfParse = require("pdf-parse") as (buf: Buffer) => Promise<{ text: string }>;
   const data = await pdfParse(buffer);
   return data.text.trim();
 }
