@@ -1,6 +1,26 @@
 import { createClient } from "@/lib/supabase/server";
 import { parseResumeText } from "@/lib/anthropic/resume-parser";
 import { NextResponse } from "next/server";
+import * as pdfjsLib from "pdfjs-dist";
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${require('pdfjs-dist/package.json').version}/build/pdf.worker.min.js`;
+
+async function extractTextFromPDF(buffer: Buffer): Promise<string> {
+  const data = new Uint8Array(buffer);
+  const pdf = await pdfjsLib.getDocument(data).promise;
+  let fullText = "";
+
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const textContent = await page.getTextContent();
+    const pageText = textContent.items
+      .map((item: any) => (item.str as string).replace(/\s+/g, " "))
+      .join(" ");
+    fullText += pageText + "\n";
+  }
+
+  return fullText.trim();
+}
 
 export async function POST(request: Request) {
   try {
@@ -32,30 +52,35 @@ export async function POST(request: Request) {
     const buffer = Buffer.from(await file.arrayBuffer());
     const filePath = `${user.id}/resume.pdf`;
 
-    const { error: storageError } = await supabase.storage.from("resumes").upload(filePath, buffer, {
-      upsert: true,
-      contentType: "application/pdf",
-    });
+    const { error: storageError } = await supabase.storage
+      .from("resumes")
+      .upload(filePath, buffer, {
+        upsert: true,
+        contentType: "application/pdf",
+      });
 
     if (storageError) {
       console.error("Storage upload error:", storageError);
       return NextResponse.json({ error: "Failed to upload file to storage" }, { status: 500 });
     }
 
-    // Extract text with pdf-parse (v2 API)
+    // Extract text with PDF.js
     let rawText: string;
     try {
-      const pdf = await import("pdf-parse/lib/pdf.js");
-      const pdfParse = await import("pdf-parse");
-      const data = await pdfParse.default(buffer);
-      rawText = data.text || "";
+      rawText = await extractTextFromPDF(buffer);
     } catch (pdfError) {
       console.error("PDF parsing error:", pdfError);
-      return NextResponse.json({ error: "Failed to extract text from PDF. Please ensure the file is a valid PDF." }, { status: 422 });
+      return NextResponse.json(
+        { error: "Failed to extract text from PDF. Please ensure the file is a valid PDF." },
+        { status: 422 }
+      );
     }
 
     if (!rawText || rawText.trim().length === 0) {
-      return NextResponse.json({ error: "Could not extract any text from the PDF. The file may be image-based or empty." }, { status: 422 });
+      return NextResponse.json(
+        { error: "Could not extract any text from the PDF. The file may be image-based or empty." },
+        { status: 422 }
+      );
     }
 
     // Parse with Claude AI
