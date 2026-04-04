@@ -1,13 +1,17 @@
 import { createClient } from "@/lib/supabase/server";
 import { parseResumeText } from "@/lib/anthropic/resume-parser";
 import { NextResponse } from "next/server";
-import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.js";
 
 export const maxDuration = 60;
 
 async function extractTextFromPDF(buffer: Buffer): Promise<string> {
+  // Dynamic import avoids Turbopack static resolution issues with pdfjs-dist ESM files
+  const pdfjsLib = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  // Disable web worker — not applicable in Node.js server context
+  pdfjsLib.GlobalWorkerOptions.workerSrc = "";
+
   const data = new Uint8Array(buffer);
-  const pdf = await pdfjsLib.getDocument(data).promise;
+  const pdf = await pdfjsLib.getDocument({ data }).promise;
   let fullText = "";
 
   for (let i = 1; i <= pdf.numPages; i++) {
