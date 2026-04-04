@@ -10,7 +10,7 @@ export async function mapApplicationFields(
   const client = getAnthropicClient();
 
   const response = await client.messages.create({
-    model: "claude-sonnet-4-20250514",
+    model: "claude-sonnet-4-5-20251001",
     max_tokens: 4096,
     system: `You are an application field-filling assistant. Given a job description and candidate data, identify common application fields and fill them from the candidate's resume and supplemental data.
 

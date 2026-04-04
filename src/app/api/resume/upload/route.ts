@@ -1,9 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
 import { parseResumeText } from "@/lib/anthropic/resume-parser";
 import { NextResponse } from "next/server";
-import * as pdfjsLib from "pdfjs-dist";
+import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.js";
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${require('pdfjs-dist/package.json').version}/build/pdf.worker.min.js`;
+export const maxDuration = 60;
 
 async function extractTextFromPDF(buffer: Buffer): Promise<string> {
   const data = new Uint8Array(buffer);
@@ -64,7 +64,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Failed to upload file to storage" }, { status: 500 });
     }
 
-    // Extract text with PDF.js
+    // Extract text with PDF.js (legacy Node build)
     let rawText: string;
     try {
       rawText = await extractTextFromPDF(buffer);
