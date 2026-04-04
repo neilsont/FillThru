@@ -1,29 +1,13 @@
 import { createClient } from "@/lib/supabase/server";
 import { parseResumeText } from "@/lib/anthropic/resume-parser";
 import { NextResponse } from "next/server";
+import pdfParse from "pdf-parse";
 
 export const maxDuration = 60;
 
 async function extractTextFromPDF(buffer: Buffer): Promise<string> {
-  // Dynamic import avoids Turbopack static resolution issues with pdfjs-dist ESM files
-  const pdfjsLib = await import("pdfjs-dist/legacy/build/pdf.mjs");
-  // Disable web worker — not applicable in Node.js server context
-  pdfjsLib.GlobalWorkerOptions.workerSrc = "";
-
-  const data = new Uint8Array(buffer);
-  const pdf = await pdfjsLib.getDocument({ data }).promise;
-  let fullText = "";
-
-  for (let i = 1; i <= pdf.numPages; i++) {
-    const page = await pdf.getPage(i);
-    const textContent = await page.getTextContent();
-    const pageText = textContent.items
-      .map((item: any) => (item.str as string).replace(/\s+/g, " "))
-      .join(" ");
-    fullText += pageText + "\n";
-  }
-
-  return fullText.trim();
+  const data = await pdfParse(buffer);
+  return data.text.trim();
 }
 
 export async function POST(request: Request) {
@@ -68,7 +52,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Failed to upload file to storage" }, { status: 500 });
     }
 
-    // Extract text with PDF.js (legacy Node build)
+    // Extract text from PDF
     let rawText: string;
     try {
       rawText = await extractTextFromPDF(buffer);
