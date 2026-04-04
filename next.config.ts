@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  serverExternalPackages: ["pdf-parse"],
+  serverExternalPackages: ["mammoth"],
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "*.supabase.co" },

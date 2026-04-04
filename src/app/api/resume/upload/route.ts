@@ -3,13 +3,27 @@ import { parseResumeText } from "@/lib/anthropic/resume-parser";
 import { NextResponse } from "next/server";
 export const maxDuration = 60;
 
+const ACCEPTED_TYPES = [
+  "application/pdf",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/msword",
+];
+
 async function extractTextFromPDF(buffer: Buffer): Promise<string> {
-  // pdf-parse is a CJS module — use require() so Turbopack skips static analysis
-  // and Vercel's file tracer includes it in the deployment bundle
+  const { extractText, getDocumentProxy } = await import("unpdf");
+  const pdf = await getDocumentProxy(new Uint8Array(buffer));
+  const { text } = await extractText(pdf, { mergePages: true });
+  return text.trim();
+}
+
+async function extractTextFromDOCX(buffer: Buffer): Promise<string> {
+  // mammoth is CJS — use require() so Turbopack skips static analysis
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const pdfParse = require("pdf-parse") as (buf: Buffer) => Promise<{ text: string }>;
-  const data = await pdfParse(buffer);
-  return data.text.trim();
+  const mammoth = require("mammoth") as {
+    extractRawText: (opts: { buffer: Buffer }) => Promise<{ value: string }>;
+  };
+  const result = await mammoth.extractRawText({ buffer });
+  return result.value.trim();
 }
 
 export async function POST(request: Request) {
@@ -30,23 +44,28 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "No file uploaded" }, { status: 400 });
     }
 
-    if (file.type !== "application/pdf") {
-      return NextResponse.json({ error: "Only PDF files are accepted" }, { status: 400 });
+    if (!ACCEPTED_TYPES.includes(file.type)) {
+      return NextResponse.json(
+        { error: "Only PDF and Word documents (.pdf, .docx) are accepted" },
+        { status: 400 }
+      );
     }
 
     if (file.size > 10 * 1024 * 1024) {
       return NextResponse.json({ error: "File size must be under 10MB" }, { status: 400 });
     }
 
-    // Upload to Supabase Storage
+    const isPDF = file.type === "application/pdf";
+    const ext = isPDF ? "pdf" : "docx";
     const buffer = Buffer.from(await file.arrayBuffer());
-    const filePath = `${user.id}/resume.pdf`;
+    const filePath = `${user.id}/resume.${ext}`;
 
+    // Upload to Supabase Storage
     const { error: storageError } = await supabase.storage
       .from("resumes")
       .upload(filePath, buffer, {
         upsert: true,
-        contentType: "application/pdf",
+        contentType: file.type,
       });
 
     if (storageError) {
@@ -54,21 +73,23 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Failed to upload file to storage" }, { status: 500 });
     }
 
-    // Extract text from PDF
+    // Extract text
     let rawText: string;
     try {
-      rawText = await extractTextFromPDF(buffer);
-    } catch (pdfError) {
-      console.error("PDF parsing error:", pdfError);
+      rawText = isPDF
+        ? await extractTextFromPDF(buffer)
+        : await extractTextFromDOCX(buffer);
+    } catch (extractError) {
+      console.error("Text extraction error:", extractError);
       return NextResponse.json(
-        { error: "Failed to extract text from PDF. Please ensure the file is a valid PDF." },
+        { error: "Failed to extract text from file. Please ensure the file is a valid PDF or Word document." },
         { status: 422 }
       );
     }
 
     if (!rawText || rawText.trim().length === 0) {
       return NextResponse.json(
-        { error: "Could not extract any text from the PDF. The file may be image-based or empty." },
+        { error: "Could not extract any text from the file. The PDF may be image-based — try a Word document instead." },
         { status: 422 }
       );
     }

@@ -18,6 +18,12 @@ const steps: { key: UploadStep; label: string; icon: React.ElementType }[] = [
   { key: "done", label: "Done!", icon: CheckCircle },
 ];
 
+const ACCEPTED_TYPES = [
+  "application/pdf",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/msword",
+];
+
 export function ResumeDropzone() {
   const [step, setStep] = useState<UploadStep>("idle");
   const [dragOver, setDragOver] = useState(false);
@@ -28,8 +34,8 @@ export function ResumeDropzone() {
 
   const handleFile = useCallback(
     async (file: File) => {
-      if (file.type !== "application/pdf") {
-        toast({ title: "Invalid file", description: "Please upload a PDF file.", variant: "destructive" });
+      if (!ACCEPTED_TYPES.includes(file.type)) {
+        toast({ title: "Invalid file", description: "Please upload a PDF or Word document (.pdf, .docx).", variant: "destructive" });
         return;
       }
 
@@ -121,7 +127,7 @@ export function ResumeDropzone() {
       <CardHeader>
         <CardTitle className="text-lg">Upload your resume</CardTitle>
         <CardDescription>
-          Upload a PDF and our AI will extract your information automatically.
+          Upload a PDF or Word document and our AI will extract your information automatically.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -148,7 +154,7 @@ export function ResumeDropzone() {
           onClick={() => {
             const input = document.createElement("input");
             input.type = "file";
-            input.accept = ".pdf";
+            input.accept = ".pdf,.docx,.doc";
             input.onchange = (e) => {
               const file = (e.target as HTMLInputElement).files?.[0];
               if (file) handleFile(file);
@@ -160,7 +166,7 @@ export function ResumeDropzone() {
           <p className="text-sm font-medium mb-1">
             Drag & drop your resume here, or click to browse
           </p>
-          <p className="text-xs text-muted-foreground">PDF only, max 10MB</p>
+          <p className="text-xs text-muted-foreground">PDF or Word document (.pdf, .docx), max 10MB</p>
         </div>
         <div className="mt-4 text-center">
           <Button variant="ghost" size="sm" onClick={() => router.push("/dashboard")}>
