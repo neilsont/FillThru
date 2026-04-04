@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Loader2 } from "lucide-react";
 
 export function AddJobDialog({
   open,
@@ -49,40 +50,43 @@ export function AddJobDialog({
           <DialogTitle>Add a job</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label htmlFor="title">Job Title *</Label>
+              <Label htmlFor="title" className="text-xs">Job Title *</Label>
               <Input
                 id="title"
                 value={form.title}
                 onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
                 required
+                className="h-9"
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="company">Company *</Label>
+              <Label htmlFor="company" className="text-xs">Company *</Label>
               <Input
                 id="company"
                 value={form.company}
                 onChange={(e) => setForm((f) => ({ ...f, company: e.target.value }))}
                 required
+                className="h-9"
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="location">Location</Label>
+              <Label htmlFor="location" className="text-xs">Location</Label>
               <Input
                 id="location"
                 value={form.location}
                 onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))}
+                className="h-9"
               />
             </div>
             <div className="space-y-1.5">
-              <Label>Job Type</Label>
+              <Label className="text-xs">Job Type</Label>
               <Select
                 value={form.job_type}
                 onValueChange={(v) => setForm((f) => ({ ...f, job_type: v }))}
               >
-                <SelectTrigger>
+                <SelectTrigger className="h-9">
                   <SelectValue placeholder="Select type" />
                 </SelectTrigger>
                 <SelectContent>
@@ -95,29 +99,34 @@ export function AddJobDialog({
             </div>
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="url">URL</Label>
+            <Label htmlFor="url" className="text-xs">URL</Label>
             <Input
               id="url"
               value={form.url}
               onChange={(e) => setForm((f) => ({ ...f, url: e.target.value }))}
               placeholder="https://..."
+              className="h-9"
             />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="description">Description</Label>
+            <Label htmlFor="description" className="text-xs">Description</Label>
             <Textarea
               id="description"
               value={form.description}
               onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-              rows={4}
+              rows={3}
             />
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="outline" size="sm" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={createJob.isPending}>
-              {createJob.isPending ? "Adding..." : "Add Job"}
+            <Button type="submit" size="sm" disabled={createJob.isPending}>
+              {createJob.isPending ? (
+                <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> Adding...</>
+              ) : (
+                "Add Job"
+              )}
             </Button>
           </DialogFooter>
         </form>

@@ -25,20 +25,20 @@ export function UserMenu({ email }: { email: string }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger>
-        <div className="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-secondary transition-colors cursor-pointer">
-          <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
-            <User className="h-4 w-4 text-primary" />
+        <div className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-secondary transition-colors cursor-pointer">
+          <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center">
+            <User className="h-3.5 w-3.5 text-primary" />
           </div>
-          <span className="text-sm font-medium max-w-[140px] truncate hidden md:block">
+          <span className="text-[13px] font-medium max-w-[140px] truncate hidden md:block">
             {email}
           </span>
         </div>
       </DropdownMenuTrigger>
       <DropdownMenuContent>
-        <DropdownMenuLabel>{email}</DropdownMenuLabel>
+        <DropdownMenuLabel className="text-xs">{email}</DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={handleSignOut}>
-          <LogOut className="h-4 w-4 mr-2" />
+          <LogOut className="h-3.5 w-3.5 mr-2" />
           Sign out
         </DropdownMenuItem>
       </DropdownMenuContent>

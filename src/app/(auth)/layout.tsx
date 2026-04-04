@@ -7,12 +7,14 @@ export default function AuthLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-full flex flex-col items-center justify-center bg-slate-50 px-4">
-      <Link href="/" className="flex items-center gap-2 mb-8">
-        <Rocket className="h-8 w-8 text-primary" />
-        <span className="text-2xl font-bold tracking-tight">CareerLaunch</span>
+    <div className="min-h-full flex flex-col items-center justify-center bg-muted/30 px-4 py-12">
+      <Link href="/" className="flex items-center gap-2.5 mb-8">
+        <div className="flex items-center justify-center h-10 w-10 rounded-xl bg-primary">
+          <Rocket className="h-5 w-5 text-white" />
+        </div>
+        <span className="text-xl font-bold tracking-tight">CareerLaunch</span>
       </Link>
-      <div className="w-full max-w-md">{children}</div>
+      <div className="w-full max-w-[400px]">{children}</div>
     </div>
   );
 }

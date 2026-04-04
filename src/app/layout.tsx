@@ -15,7 +15,10 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "CareerLaunch - AI-Powered Job Application Assistant",
+  title: {
+    default: "CareerLaunch - AI-Powered Job Application Assistant",
+    template: "%s | CareerLaunch",
+  },
   description: "Upload your resume, discover jobs, and apply with AI-powered assistance.",
 };
 
@@ -26,7 +29,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full`}>
-      <body className="h-full antialiased">
+      <body className="h-full">
         <QueryProvider>
           <ToastProvider>{children}</ToastProvider>
         </QueryProvider>

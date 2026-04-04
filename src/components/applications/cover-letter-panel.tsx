@@ -30,11 +30,13 @@ export function CoverLetterPanel({
 
   if (!coverLetter && !text) {
     return (
-      <Card>
-        <CardContent className="py-8 text-center">
-          <FileText className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+      <Card className="border-border/60">
+        <CardContent className="py-10 text-center">
+          <div className="rounded-2xl bg-muted/80 p-4 inline-block mb-3">
+            <FileText className="h-6 w-6 text-muted-foreground" />
+          </div>
           <p className="text-sm text-muted-foreground">
-            No cover letter yet. Click &ldquo;Generate Cover Letter&rdquo; above.
+            No cover letter yet. Click &ldquo;Cover Letter&rdquo; above to generate one.
           </p>
         </CardContent>
       </Card>
@@ -42,15 +44,15 @@ export function CoverLetterPanel({
   }
 
   return (
-    <Card>
+    <Card className="border-border/60">
       <CardContent className="p-4">
         <Textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
           rows={16}
-          className="font-serif text-sm"
+          className="font-serif text-sm leading-relaxed"
         />
-        <Button size="sm" className="mt-2" onClick={handleSave} disabled={updateApp.isPending}>
+        <Button size="sm" className="mt-3" onClick={handleSave} disabled={updateApp.isPending}>
           Save Changes
         </Button>
       </CardContent>

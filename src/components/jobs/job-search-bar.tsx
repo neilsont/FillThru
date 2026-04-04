@@ -61,22 +61,22 @@ export function JobSearchBar() {
     <div className="relative flex-1">
       <div className="flex gap-2">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
           <Input
             placeholder="Search jobs..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            className="pl-9"
+            className="pl-8 h-9 text-sm"
             onKeyDown={(e) => e.key === "Enter" && handleSearch()}
           />
         </div>
-        <div className="relative w-40">
-          <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <div className="relative w-36">
+          <MapPin className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
           <Input
             placeholder="Location"
             value={location}
             onChange={(e) => setLocation(e.target.value)}
-            className="pl-9"
+            className="pl-8 h-9 text-sm"
           />
         </div>
         <Button
@@ -86,7 +86,7 @@ export function JobSearchBar() {
           variant="accent"
         >
           {searchMutation.isPending ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
           ) : (
             "Search"
           )}
@@ -94,19 +94,19 @@ export function JobSearchBar() {
       </div>
 
       {showResults && results.length > 0 && (
-        <Card className="absolute top-full mt-2 left-0 right-0 z-50 max-h-96 overflow-y-auto">
-          <CardContent className="p-2 space-y-2">
+        <Card className="absolute top-full mt-2 left-0 right-0 z-50 max-h-80 overflow-y-auto shadow-lg border-border/60">
+          <CardContent className="p-2 space-y-1">
             {results.map((result, i) => (
               <div
                 key={i}
-                className="flex items-start justify-between gap-3 p-3 rounded-lg hover:bg-muted/50"
+                className="flex items-start justify-between gap-3 p-2.5 rounded-md hover:bg-muted/50 transition-colors"
               >
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-sm">{result.title}</p>
                   <p className="text-xs text-muted-foreground">
                     {result.company} &middot; {result.location}
                   </p>
-                  <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                  <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
                     {result.description}
                   </p>
                 </div>
@@ -115,6 +115,7 @@ export function JobSearchBar() {
                   variant="outline"
                   onClick={() => handleAdd(result)}
                   disabled={createJob.isPending}
+                  className="h-7 text-xs"
                 >
                   <Plus className="h-3 w-3 mr-1" /> Add
                 </Button>
@@ -122,7 +123,7 @@ export function JobSearchBar() {
             ))}
             <Button
               variant="ghost"
-              className="w-full text-xs"
+              className="w-full text-xs h-8"
               onClick={() => setShowResults(false)}
             >
               Close results

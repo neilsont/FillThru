@@ -19,8 +19,8 @@ export function ResumeSection() {
   if (isLoading) {
     return (
       <div className="space-y-4 mt-4">
-        <Skeleton className="h-40 w-full" />
-        <Skeleton className="h-60 w-full" />
+        <Skeleton className="h-36 w-full rounded-lg" />
+        <Skeleton className="h-48 w-full rounded-lg" />
       </div>
     );
   }
@@ -56,12 +56,12 @@ export function ResumeSection() {
   return (
     <div className="space-y-4 mt-4">
       {/* Personal Info */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Personal Information</CardTitle>
+      <Card className="border-border/60">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Personal Information</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <EditableField label="Name" value={resume.personal.name} onSave={(v) => handleSave("personal.name", v)} />
             <EditableField label="Email" value={resume.personal.email} onSave={(v) => handleSave("personal.email", v)} />
             <EditableField label="Phone" value={resume.personal.phone} onSave={(v) => handleSave("personal.phone", v)} />
@@ -71,35 +71,35 @@ export function ResumeSection() {
       </Card>
 
       {/* Summary */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Summary</CardTitle>
+      <Card className="border-border/60">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Summary</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-muted-foreground">{resume.summary || "No summary provided"}</p>
+          <p className="text-sm text-foreground/80 leading-relaxed">{resume.summary || "No summary provided"}</p>
         </CardContent>
       </Card>
 
       {/* Experience */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Briefcase className="h-5 w-5" /> Experience
+      <Card className="border-border/60">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+            <Briefcase className="h-4 w-4" /> Experience
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           {resume.experience.map((exp, i) => (
             <div key={i} className="border-l-2 border-primary/20 pl-4">
-              <p className="font-semibold">{exp.title}</p>
+              <p className="font-medium text-sm">{exp.title}</p>
               <p className="text-sm text-muted-foreground">
                 {exp.company} &middot; {exp.location}
               </p>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-muted-foreground mt-0.5">
                 {exp.start_date} &mdash; {exp.end_date || "Present"}
               </p>
               <ul className="mt-2 space-y-1">
                 {exp.bullets.map((bullet, j) => (
-                  <li key={j} className="text-sm text-muted-foreground">
+                  <li key={j} className="text-sm text-foreground/70 leading-relaxed">
                     &bull; {bullet}
                   </li>
                 ))}
@@ -113,16 +113,16 @@ export function ResumeSection() {
       </Card>
 
       {/* Education */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
-            <GraduationCap className="h-5 w-5" /> Education
+      <Card className="border-border/60">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+            <GraduationCap className="h-4 w-4" /> Education
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           {resume.education.map((edu, i) => (
             <div key={i}>
-              <p className="font-semibold">{edu.degree}</p>
+              <p className="font-medium text-sm">{edu.degree}</p>
               <p className="text-sm text-muted-foreground">
                 {edu.institution} &middot; {edu.graduation_date}
               </p>
@@ -136,14 +136,14 @@ export function ResumeSection() {
       </Card>
 
       {/* Skills */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Skills</CardTitle>
+      <Card className="border-border/60">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Skills</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-1.5">
             {resume.skills.map((skill, i) => (
-              <Badge key={i} variant="secondary">{skill}</Badge>
+              <Badge key={i} variant="secondary" className="text-xs">{skill}</Badge>
             ))}
             {resume.skills.length === 0 && (
               <p className="text-sm text-muted-foreground">No skills listed</p>
@@ -154,14 +154,14 @@ export function ResumeSection() {
 
       {/* Certifications */}
       {resume.certifications.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Certifications</CardTitle>
+        <Card className="border-border/60">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Certifications</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-1.5">
               {resume.certifications.map((cert, i) => (
-                <Badge key={i} variant="outline">{cert}</Badge>
+                <Badge key={i} variant="outline" className="text-xs">{cert}</Badge>
               ))}
             </div>
           </CardContent>
@@ -201,10 +201,11 @@ function EditableField({
             }
           }}
           autoFocus
+          className="mt-1"
         />
       ) : (
         <p
-          className="text-sm cursor-pointer hover:bg-muted/50 rounded px-2 py-1 -mx-2"
+          className="text-sm cursor-pointer hover:bg-muted rounded px-2 py-1.5 -mx-2 mt-0.5 transition-colors"
           onClick={() => setEditing(true)}
         >
           {value || <span className="text-muted-foreground italic">Click to edit</span>}

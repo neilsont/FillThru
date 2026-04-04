@@ -28,7 +28,10 @@ export default function ApplicationsPage() {
     return (
       <div>
         <PageHeader title="Applications" />
-        <Skeleton className="h-64 w-full" />
+        <div className="space-y-3">
+          <Skeleton className="h-10 w-full rounded-lg" />
+          <Skeleton className="h-64 w-full rounded-lg" />
+        </div>
       </div>
     );
   }
@@ -38,7 +41,7 @@ export default function ApplicationsPage() {
       <PageHeader title="Applications" description="Track all your job applications">
         {applications && applications.length > 0 && (
           <Button variant="outline" size="sm" onClick={handleExport}>
-            <Download className="h-4 w-4 mr-1" /> Export CSV
+            <Download className="h-3.5 w-3.5 mr-1.5" /> Export CSV
           </Button>
         )}
       </PageHeader>

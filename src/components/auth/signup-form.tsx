@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Loader2 } from "lucide-react";
 
 export function SignupForm() {
   const [email, setEmail] = useState("");
@@ -43,19 +44,19 @@ export function SignupForm() {
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Create your account</CardTitle>
+    <Card className="shadow-sm border-border/60">
+      <CardHeader className="text-center pb-4">
+        <CardTitle className="text-xl">Create your account</CardTitle>
         <CardDescription>Get started with CareerLaunch in seconds</CardDescription>
       </CardHeader>
       <form onSubmit={handleSubmit}>
         <CardContent className="space-y-4">
           {error && (
-            <div className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            <div className="rounded-lg bg-destructive/10 px-3 py-2.5 text-sm text-destructive">
               {error}
             </div>
           )}
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             <Label htmlFor="email">Email</Label>
             <Input
               id="email"
@@ -66,7 +67,7 @@ export function SignupForm() {
               required
             />
           </div>
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             <Label htmlFor="password">Password</Label>
             <Input
               id="password"
@@ -79,13 +80,19 @@ export function SignupForm() {
             />
           </div>
         </CardContent>
-        <CardFooter className="flex flex-col gap-3">
+        <CardFooter className="flex flex-col gap-4 pt-2">
           <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? "Creating account..." : "Create account"}
+            {loading ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin mr-1" /> Creating account...
+              </>
+            ) : (
+              "Create account"
+            )}
           </Button>
           <p className="text-sm text-muted-foreground">
             Already have an account?{" "}
-            <Link href="/login" className="text-primary hover:underline">
+            <Link href="/login" className="text-primary font-medium hover:underline">
               Sign in
             </Link>
           </p>

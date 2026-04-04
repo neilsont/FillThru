@@ -17,7 +17,6 @@ export function SupplementalForm() {
   const { toast } = useToast();
   const [values, setValues] = useState<Record<string, string>>({});
 
-  // Build the answers map
   useEffect(() => {
     if (answers) {
       const map: Record<string, string> = {};
@@ -28,7 +27,6 @@ export function SupplementalForm() {
     }
   }, [answers]);
 
-  // Find AI-flagged questions not in the standard list
   const extraQuestions = answers
     ?.filter((a) => a.source === "ai_suggested" && !SUPPLEMENTAL_QUESTIONS.find((q) => q.key === a.question_key))
     .map((a) => ({ key: a.question_key, label: a.question_label, type: "text" as const })) ?? [];
@@ -39,7 +37,7 @@ export function SupplementalForm() {
     return (
       <div className="space-y-4 mt-4">
         {Array.from({ length: 4 }).map((_, i) => (
-          <Skeleton key={i} className="h-20 w-full" />
+          <Skeleton key={i} className="h-16 w-full rounded-lg" />
         ))}
       </div>
     );
@@ -54,10 +52,10 @@ export function SupplementalForm() {
   };
 
   return (
-    <Card className="mt-4">
-      <CardHeader>
-        <CardTitle className="text-lg">Supplemental Information</CardTitle>
-        <CardDescription>
+    <Card className="mt-4 border-border/60">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Supplemental Information</CardTitle>
+        <CardDescription className="text-xs">
           Pre-fill common application fields. These answers are reused across all your applications.
         </CardDescription>
       </CardHeader>
@@ -72,9 +70,9 @@ export function SupplementalForm() {
             return (
               <div key={q.key} className="space-y-1.5">
                 <div className="flex items-center gap-2">
-                  <Label htmlFor={q.key}>{q.label}</Label>
+                  <Label htmlFor={q.key} className="text-[13px]">{q.label}</Label>
                   {isFlagged && !hasAnswer && (
-                    <Badge variant="warning" className="text-xs">Needs answer</Badge>
+                    <Badge variant="warning" className="text-[10px] px-1.5 py-0">Needs answer</Badge>
                   )}
                 </div>
                 {q.type === "select" && "options" in q ? (
@@ -82,7 +80,7 @@ export function SupplementalForm() {
                     value={values[q.key] || ""}
                     onValueChange={(v) => handleSave(q.key, q.label, v)}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="h-9">
                       <SelectValue placeholder="Select an option" />
                     </SelectTrigger>
                     <SelectContent>
@@ -102,6 +100,7 @@ export function SupplementalForm() {
                       if (values[q.key]) handleSave(q.key, q.label, values[q.key]);
                     }}
                     placeholder={`Enter ${q.label.toLowerCase()}`}
+                    className="h-9"
                   />
                 )}
               </div>

@@ -12,10 +12,17 @@ import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CoverLetterPanel } from "./cover-letter-panel";
 import { FieldMappingForm } from "./field-mapping-form";
-import { ArrowLeft, ExternalLink, MapPin, Building2, Briefcase, Loader2 } from "lucide-react";
+import { ArrowLeft, ExternalLink, MapPin, Building2, Briefcase, Loader2, Sparkles, FileText } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import type { FieldMapping } from "@/types/application";
+
+const STATUS_VARIANT: Record<string, "default" | "secondary" | "success" | "destructive" | "warning"> = {
+  draft: "secondary",
+  ready: "default",
+  submitted: "success",
+  withdrawn: "destructive",
+};
 
 export function ApplicationDetail({ jobId }: { jobId: string }) {
   const { data: job, isLoading: jobLoading } = useJob(jobId);
@@ -32,17 +39,24 @@ export function ApplicationDetail({ jobId }: { jobId: string }) {
   if (isLoading) {
     return (
       <div className="space-y-4">
-        <Skeleton className="h-8 w-64" />
-        <div className="grid grid-cols-2 gap-6">
-          <Skeleton className="h-96" />
-          <Skeleton className="h-96" />
+        <Skeleton className="h-6 w-48 rounded" />
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Skeleton className="h-96 rounded-lg" />
+          <Skeleton className="h-96 rounded-lg" />
         </div>
       </div>
     );
   }
 
   if (!job) {
-    return <p className="text-muted-foreground">Job not found.</p>;
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-center">
+        <p className="text-muted-foreground">Job not found.</p>
+        <Button variant="outline" size="sm" className="mt-3" asChild>
+          <Link href="/dashboard">Back to dashboard</Link>
+        </Button>
+      </div>
+    );
   }
 
   const handleStartApplication = async () => {
@@ -97,34 +111,34 @@ export function ApplicationDetail({ jobId }: { jobId: string }) {
 
   return (
     <div>
-      <div className="mb-4">
+      <div className="mb-5">
         <Link
           href="/dashboard"
-          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
         >
-          <ArrowLeft className="h-4 w-4" /> Back to dashboard
+          <ArrowLeft className="h-3.5 w-3.5" /> Back to dashboard
         </Link>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Left: Job Description */}
-        <Card>
-          <CardHeader>
+        <Card className="border-border/60">
+          <CardHeader className="pb-3">
             <div className="flex items-start justify-between">
               <div>
-                <CardTitle>{job.title}</CardTitle>
-                <div className="flex items-center gap-3 mt-2 text-sm text-muted-foreground">
+                <CardTitle className="text-lg">{job.title}</CardTitle>
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-sm text-muted-foreground">
                   <span className="flex items-center gap-1">
-                    <Building2 className="h-4 w-4" /> {job.company}
+                    <Building2 className="h-3.5 w-3.5" /> {job.company}
                   </span>
                   {job.location && (
                     <span className="flex items-center gap-1">
-                      <MapPin className="h-4 w-4" /> {job.location}
+                      <MapPin className="h-3.5 w-3.5" /> {job.location}
                     </span>
                   )}
                   {job.job_type && (
                     <span className="flex items-center gap-1">
-                      <Briefcase className="h-4 w-4" /> {job.job_type}
+                      <Briefcase className="h-3.5 w-3.5" /> {job.job_type}
                     </span>
                   )}
                 </div>
@@ -132,40 +146,47 @@ export function ApplicationDetail({ jobId }: { jobId: string }) {
               {job.url && (
                 <a href={job.url} target="_blank" rel="noopener noreferrer">
                   <Button variant="outline" size="sm">
-                    <ExternalLink className="h-4 w-4 mr-1" /> View posting
+                    <ExternalLink className="h-3.5 w-3.5 mr-1" /> View
                   </Button>
                 </a>
               )}
             </div>
           </CardHeader>
           <CardContent>
-            <div className="prose prose-sm max-w-none">
-              {job.description ? (
-                <div className="whitespace-pre-wrap text-sm">{job.description}</div>
-              ) : (
-                <p className="text-muted-foreground italic">No job description provided.</p>
-              )}
-            </div>
+            {job.description ? (
+              <div className="whitespace-pre-wrap text-sm text-foreground/80 leading-relaxed">
+                {job.description}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground italic">No job description provided.</p>
+            )}
           </CardContent>
         </Card>
 
         {/* Right: Application Panel */}
         <div className="space-y-4">
           {!application ? (
-            <Card>
-              <CardContent className="py-8 text-center">
-                <p className="text-muted-foreground mb-4">
+            <Card className="border-border/60">
+              <CardContent className="py-12 text-center">
+                <div className="rounded-2xl bg-muted/80 p-4 inline-block mb-4">
+                  <FileText className="h-7 w-7 text-muted-foreground" />
+                </div>
+                <p className="text-sm text-muted-foreground mb-4">
                   No application started for this job yet.
                 </p>
                 <Button onClick={handleStartApplication} disabled={createApp.isPending}>
-                  {createApp.isPending ? "Starting..." : "Start Application"}
+                  {createApp.isPending ? (
+                    <><Loader2 className="h-4 w-4 animate-spin mr-1" /> Starting...</>
+                  ) : (
+                    "Start Application"
+                  )}
                 </Button>
               </CardContent>
             </Card>
           ) : (
             <>
               <div className="flex items-center gap-2">
-                <Badge variant={application.status === "submitted" ? "success" : "secondary"}>
+                <Badge variant={STATUS_VARIANT[application.status] || "secondary"}>
                   {application.status}
                 </Badge>
                 <div className="flex-1" />
@@ -176,9 +197,9 @@ export function ApplicationDetail({ jobId }: { jobId: string }) {
                   disabled={generateCL.isPending}
                 >
                   {generateCL.isPending ? (
-                    <><Loader2 className="h-4 w-4 animate-spin mr-1" /> Generating...</>
+                    <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> Generating...</>
                   ) : (
-                    "Generate Cover Letter"
+                    <><Sparkles className="h-3.5 w-3.5 mr-1" /> Cover Letter</>
                   )}
                 </Button>
                 <Button
@@ -188,7 +209,7 @@ export function ApplicationDetail({ jobId }: { jobId: string }) {
                   disabled={mapFields.isPending}
                 >
                   {mapFields.isPending ? (
-                    <><Loader2 className="h-4 w-4 animate-spin mr-1" /> Mapping...</>
+                    <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> Mapping...</>
                   ) : (
                     "Auto-fill Fields"
                   )}
@@ -201,7 +222,7 @@ export function ApplicationDetail({ jobId }: { jobId: string }) {
                   <TabsTrigger value="fields">
                     Fields
                     {fieldMappings.some((f) => f.confidence < 0.7) && (
-                      <span className="ml-1 h-2 w-2 rounded-full bg-accent inline-block" />
+                      <span className="ml-1.5 h-1.5 w-1.5 rounded-full bg-accent inline-block" />
                     )}
                   </TabsTrigger>
                   <TabsTrigger value="notes">Notes</TabsTrigger>
@@ -219,7 +240,7 @@ export function ApplicationDetail({ jobId }: { jobId: string }) {
                 </TabsContent>
 
                 <TabsContent value="notes">
-                  <Card>
+                  <Card className="border-border/60">
                     <CardContent className="p-4">
                       <Textarea
                         placeholder="Add personal notes about this application..."
@@ -227,7 +248,7 @@ export function ApplicationDetail({ jobId }: { jobId: string }) {
                         onChange={(e) => setNotes(e.target.value)}
                         rows={6}
                       />
-                      <Button size="sm" className="mt-2" onClick={handleSaveNotes}>
+                      <Button size="sm" className="mt-3" onClick={handleSaveNotes}>
                         Save Notes
                       </Button>
                     </CardContent>
@@ -237,17 +258,18 @@ export function ApplicationDetail({ jobId }: { jobId: string }) {
 
               <div className="flex gap-2">
                 {application.status === "draft" && (
-                  <Button onClick={() => handleStatusChange("ready")}>
+                  <Button size="sm" onClick={() => handleStatusChange("ready")}>
                     Mark as Ready
                   </Button>
                 )}
                 {application.status === "ready" && (
-                  <Button onClick={() => handleStatusChange("submitted")} variant="accent">
+                  <Button size="sm" onClick={() => handleStatusChange("submitted")} variant="accent">
                     Mark as Submitted
                   </Button>
                 )}
                 {(application.status === "draft" || application.status === "ready") && (
                   <Button
+                    size="sm"
                     onClick={() => handleStatusChange("withdrawn")}
                     variant="outline"
                   >

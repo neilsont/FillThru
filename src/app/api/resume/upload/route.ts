@@ -32,20 +32,40 @@ export async function POST(request: Request) {
     const buffer = Buffer.from(await file.arrayBuffer());
     const filePath = `${user.id}/resume.pdf`;
 
-    await supabase.storage.from("resumes").upload(filePath, buffer, {
+    const { error: storageError } = await supabase.storage.from("resumes").upload(filePath, buffer, {
       upsert: true,
       contentType: "application/pdf",
     });
 
-    // Extract text with pdf-parse (v2 API uses class constructor)
-    const pdfParse = await import("pdf-parse");
-    const Parser = pdfParse.PDFParse;
-    const parser = new Parser({ data: buffer });
-    const pdfResult = await parser.getText();
-    const rawText = typeof pdfResult === "string" ? pdfResult : (pdfResult as { text: string }).text;
+    if (storageError) {
+      console.error("Storage upload error:", storageError);
+      return NextResponse.json({ error: "Failed to upload file to storage" }, { status: 500 });
+    }
+
+    // Extract text with pdf-parse (v2 API - PDFParse class)
+    let rawText: string;
+    try {
+      const { PDFParse } = await import("pdf-parse");
+      const parser = new PDFParse({ data: buffer });
+      const pdfResult = await parser.getText();
+      rawText = typeof pdfResult === "string" ? pdfResult : (pdfResult as { text: string }).text;
+    } catch (pdfError) {
+      console.error("PDF parsing error:", pdfError);
+      return NextResponse.json({ error: "Failed to extract text from PDF. Please ensure the file is a valid PDF." }, { status: 422 });
+    }
+
+    if (!rawText || rawText.trim().length === 0) {
+      return NextResponse.json({ error: "Could not extract any text from the PDF. The file may be image-based or empty." }, { status: 422 });
+    }
 
     // Parse with Claude AI
-    const parsedJson = await parseResumeText(rawText);
+    let parsedJson;
+    try {
+      parsedJson = await parseResumeText(rawText);
+    } catch (aiError) {
+      console.error("AI parsing error:", aiError);
+      return NextResponse.json({ error: "Failed to analyze resume with AI. Please try again." }, { status: 500 });
+    }
 
     // Upsert into resume_data
     const { error: dbError } = await supabase.from("resume_data").upsert(
@@ -60,7 +80,8 @@ export async function POST(request: Request) {
     );
 
     if (dbError) {
-      return NextResponse.json({ error: dbError.message }, { status: 500 });
+      console.error("Database upsert error:", dbError);
+      return NextResponse.json({ error: "Failed to save resume data" }, { status: 500 });
     }
 
     return NextResponse.json(parsedJson);

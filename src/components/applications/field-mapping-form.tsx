@@ -10,8 +10,8 @@ import type { FieldMapping } from "@/types/application";
 export function FieldMappingForm({ mappings }: { mappings: FieldMapping[] }) {
   if (!mappings.length) {
     return (
-      <Card>
-        <CardContent className="py-8 text-center">
+      <Card className="border-border/60">
+        <CardContent className="py-10 text-center">
           <p className="text-sm text-muted-foreground">
             No fields mapped yet. Click &ldquo;Auto-fill Fields&rdquo; above to let AI fill in your application.
           </p>
@@ -21,7 +21,7 @@ export function FieldMappingForm({ mappings }: { mappings: FieldMapping[] }) {
   }
 
   return (
-    <Card>
+    <Card className="border-border/60">
       <CardContent className="p-4 space-y-3">
         {mappings.map((field) => (
           <div key={field.field_key} className="space-y-1">
@@ -30,7 +30,7 @@ export function FieldMappingForm({ mappings }: { mappings: FieldMapping[] }) {
                 {field.field_label}
               </label>
               <ConfidenceIndicator confidence={field.confidence} />
-              <Badge variant="secondary" className="text-[10px]">
+              <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
                 {field.source}
               </Badge>
             </div>
@@ -39,8 +39,8 @@ export function FieldMappingForm({ mappings }: { mappings: FieldMapping[] }) {
                 value={field.value}
                 readOnly
                 className={cn(
-                  "text-sm",
-                  field.confidence < 0.7 && "border-accent"
+                  "text-sm h-8",
+                  field.confidence < 0.7 && "border-accent/60"
                 )}
               />
               {field.confidence < 0.7 && (
@@ -64,9 +64,9 @@ function ConfidenceIndicator({ confidence }: { confidence: number }) {
 
   return (
     <div className="flex items-center gap-1">
-      <div className="h-1.5 w-12 rounded-full bg-muted overflow-hidden">
+      <div className="h-1.5 w-10 rounded-full bg-muted overflow-hidden">
         <div
-          className={cn("h-full rounded-full", color)}
+          className={cn("h-full rounded-full transition-all", color)}
           style={{ width: `${confidence * 100}%` }}
         />
       </div>

@@ -6,9 +6,10 @@ import { useUploadResume } from "@/hooks/use-resume";
 import { useToast } from "@/components/ui/toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Upload, FileText, Loader2, CheckCircle, Brain } from "lucide-react";
+import { Upload, FileText, Loader2, CheckCircle, Brain, AlertCircle } from "lucide-react";
+import { cn } from "@/lib/utils";
 
-type UploadStep = "idle" | "uploading" | "extracting" | "analyzing" | "done";
+type UploadStep = "idle" | "uploading" | "extracting" | "analyzing" | "done" | "error";
 
 const steps: { key: UploadStep; label: string; icon: React.ElementType }[] = [
   { key: "uploading", label: "Uploading file...", icon: Upload },
@@ -20,6 +21,7 @@ const steps: { key: UploadStep; label: string; icon: React.ElementType }[] = [
 export function ResumeDropzone() {
   const [step, setStep] = useState<UploadStep>("idle");
   const [dragOver, setDragOver] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
   const uploadMutation = useUploadResume();
   const router = useRouter();
   const { toast } = useToast();
@@ -31,9 +33,14 @@ export function ResumeDropzone() {
         return;
       }
 
-      setStep("uploading");
+      if (file.size > 10 * 1024 * 1024) {
+        toast({ title: "File too large", description: "Maximum file size is 10MB.", variant: "destructive" });
+        return;
+      }
 
-      // Simulate step progression (actual work happens in one API call)
+      setStep("uploading");
+      setErrorMessage("");
+
       const stepTimers = [
         setTimeout(() => setStep("extracting"), 1500),
         setTimeout(() => setStep("analyzing"), 3000),
@@ -47,10 +54,12 @@ export function ResumeDropzone() {
         setTimeout(() => router.push("/dashboard"), 1500);
       } catch (err) {
         stepTimers.forEach(clearTimeout);
-        setStep("idle");
+        const message = err instanceof Error ? err.message : "Something went wrong";
+        setStep("error");
+        setErrorMessage(message);
         toast({
           title: "Upload failed",
-          description: err instanceof Error ? err.message : "Something went wrong",
+          description: message,
           variant: "destructive",
         });
       }
@@ -68,14 +77,14 @@ export function ResumeDropzone() {
     [handleFile]
   );
 
-  if (step !== "idle") {
+  if (step !== "idle" && step !== "error") {
     return (
-      <Card>
+      <Card className="max-w-lg mx-auto border-border/60">
         <CardHeader>
-          <CardTitle>Processing your resume</CardTitle>
+          <CardTitle className="text-lg">Processing your resume</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
+          <div className="space-y-3">
             {steps.map((s) => {
               const stepIdx = steps.findIndex((st) => st.key === s.key);
               const currentIdx = steps.findIndex((st) => st.key === step);
@@ -85,16 +94,17 @@ export function ResumeDropzone() {
               return (
                 <div
                   key={s.key}
-                  className={`flex items-center gap-3 p-3 rounded-lg transition-colors ${
+                  className={cn(
+                    "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors",
                     isActive ? "bg-primary/10 text-primary" : isDone ? "text-emerald-600" : "text-muted-foreground"
-                  }`}
+                  )}
                 >
                   {isActive && step !== "done" ? (
-                    <Loader2 className="h-5 w-5 animate-spin" />
+                    <Loader2 className="h-4 w-4 animate-spin" />
                   ) : isDone ? (
-                    <CheckCircle className="h-5 w-5" />
+                    <CheckCircle className="h-4 w-4" />
                   ) : (
-                    <s.icon className="h-5 w-5" />
+                    <s.icon className="h-4 w-4" />
                   )}
                   <span className="font-medium text-sm">{s.label}</span>
                 </div>
@@ -107,14 +117,23 @@ export function ResumeDropzone() {
   }
 
   return (
-    <Card>
+    <Card className="max-w-lg mx-auto border-border/60">
       <CardHeader>
-        <CardTitle>Upload your resume</CardTitle>
+        <CardTitle className="text-lg">Upload your resume</CardTitle>
         <CardDescription>
           Upload a PDF and our AI will extract your information automatically.
         </CardDescription>
       </CardHeader>
       <CardContent>
+        {step === "error" && errorMessage && (
+          <div className="flex items-start gap-2 rounded-lg bg-destructive/10 px-3 py-2.5 text-sm text-destructive mb-4">
+            <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+            <div>
+              <p className="font-medium">Upload failed</p>
+              <p className="text-xs mt-0.5">{errorMessage}</p>
+            </div>
+          </div>
+        )}
         <div
           onDrop={handleDrop}
           onDragOver={(e) => {
@@ -122,9 +141,10 @@ export function ResumeDropzone() {
             setDragOver(true);
           }}
           onDragLeave={() => setDragOver(false)}
-          className={`border-2 border-dashed rounded-lg p-12 text-center transition-colors cursor-pointer ${
+          className={cn(
+            "border-2 border-dashed rounded-lg p-10 text-center transition-colors cursor-pointer",
             dragOver ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"
-          }`}
+          )}
           onClick={() => {
             const input = document.createElement("input");
             input.type = "file";
@@ -136,14 +156,14 @@ export function ResumeDropzone() {
             input.click();
           }}
         >
-          <Upload className="h-10 w-10 text-muted-foreground mx-auto mb-4" />
+          <Upload className="h-8 w-8 text-muted-foreground mx-auto mb-3" />
           <p className="text-sm font-medium mb-1">
             Drag & drop your resume here, or click to browse
           </p>
           <p className="text-xs text-muted-foreground">PDF only, max 10MB</p>
         </div>
         <div className="mt-4 text-center">
-          <Button variant="ghost" onClick={() => router.push("/dashboard")}>
+          <Button variant="ghost" size="sm" onClick={() => router.push("/dashboard")}>
             Skip for now
           </Button>
         </div>
