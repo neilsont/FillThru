@@ -35,33 +35,58 @@
   --font-mono: var(--font-geist-mono);
 }
 
+/* ── Yacht / Urban palette ───────────────────────────────────────────────────
+   Navy  #0c1f3a   deep primary, sidebar
+   Gold  #b8941f   accent / CTA
+   Ivory #faf9f6   page background — warm, not clinical white
+   Pearl #f0ede8   muted surfaces
+   Charcoal #1c2333  body text
+   Slate #8b95a5   muted text
+   ──────────────────────────────────────────────────────────────────────────── */
+
 :root {
-  --background: #ffffff;
-  --foreground: #111827;
-  --primary: #6366f1;
+  /* Canvas */
+  --background: #faf9f6;
+  --foreground: #1c2333;
+
+  /* Brand navy */
+  --primary: #1a3a5c;
   --primary-foreground: #ffffff;
-  --secondary: #f3f4f6;
-  --secondary-foreground: #111827;
-  --muted: #f9fafb;
-  --muted-foreground: #6b7280;
-  --accent: #f97316;
+
+  /* Gold accent — buttons, highlights */
+  --accent: #b8941f;
   --accent-foreground: #ffffff;
-  --destructive: #ef4444;
+
+  /* Neutral surfaces */
+  --secondary: #f0ede8;
+  --secondary-foreground: #1c2333;
+  --muted: #f5f3ef;
+  --muted-foreground: #7a8494;
+
+  /* Status */
+  --destructive: #c0392b;
   --destructive-foreground: #ffffff;
-  --success: #10b981;
+  --success: #1a6645;
   --success-foreground: #ffffff;
-  --warning: #f59e0b;
+  --warning: #b8941f;
   --warning-foreground: #ffffff;
-  --border: #e5e7eb;
-  --input: #e5e7eb;
-  --ring: #6366f1;
+
+  /* Chrome */
+  --border: #ddd8cf;
+  --input: #ddd8cf;
+  --ring: #1a3a5c;
+
+  /* Cards / overlays */
   --card: #ffffff;
-  --card-foreground: #111827;
+  --card-foreground: #1c2333;
   --popover: #ffffff;
-  --popover-foreground: #111827;
-  --sidebar: #1e1b4b;
-  --sidebar-foreground: #e2e8f0;
-  --sidebar-accent: #312e81;
+  --popover-foreground: #1c2333;
+
+  /* Sidebar — darkest navy */
+  --sidebar: #0c1f3a;
+  --sidebar-foreground: #d4cfc8;
+  --sidebar-accent: #1a3a5c;
+
   --radius: 0.5rem;
 }
 
@@ -75,6 +100,12 @@
     font-family: var(--font-sans), system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Subtle gold focus ring on interactive elements */
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
   }
 }
 
@@ -99,5 +130,13 @@
   @keyframes badge-pulse {
     0%, 100% { transform: scale(1); }
     50% { transform: scale(1.15); }
+  }
+
+  /* Gold shimmer on hover for accent elements */
+  .gold-hover {
+    transition: box-shadow 0.2s ease;
+  }
+  .gold-hover:hover {
+    box-shadow: 0 0 0 1px rgba(184,148,31,0.4), 0 4px 12px rgba(184,148,31,0.15);
   }
 }

@@ -10,8 +10,8 @@ export default async function HomePage() {
   } = await supabase.auth.getUser();
 
   return (
-    <div className="min-h-full bg-white">
-      <header className="border-b border-border/60">
+    <div className="min-h-full bg-background">
+      <header className="border-b border-border/60 bg-white/80 backdrop-blur-sm sticky top-0 z-40">
         <div className="max-w-6xl mx-auto flex items-center justify-between h-14 px-4">
           <div className="flex items-center gap-2.5">
             <div className="flex items-center justify-center h-8 w-8 rounded-lg bg-primary">
@@ -116,7 +116,7 @@ export default async function HomePage() {
 
         <section className="py-16 px-4 text-center">
           <p className="text-muted-foreground text-sm">
-            Built with Next.js, Supabase & Gemini AI
+            Built with Next.js, Supabase & AI
           </p>
         </section>
       </main>
