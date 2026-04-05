@@ -37,6 +37,7 @@
     "storage",
     "activeTab",
     "scripting",
+    "webNavigation",
     "notifications",
     "identity"
   ],

@@ -69,7 +69,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   async function broadcastToTab(tabId, payload) {
     try {
-      const frames = await chrome.scripting.getAllFrames({ tabId });
+      const frames = await chrome.webNavigation.getAllFrames({ tabId });
       const framesWithResponse = await Promise.all(
         frames.map((f) =>
           chrome.tabs.sendMessage(tabId, payload, { frameId: f.frameId })
