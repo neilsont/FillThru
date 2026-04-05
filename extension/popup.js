@@ -188,11 +188,29 @@ async function runAutofill() {
   try {
     const profileData = await fetchProfile(access_token);
     const tab = await getCurrentTab();
-    const response = await chrome.tabs.sendMessage(tab.id, {
-      type: "CL_AUTOFILL",
-      profile: profileData.profile,
-      supplemental: profileData.supplemental,
-    });
+
+    // Send message to content script; if not injected yet, inject it and retry
+    async function sendAutofill() {
+      return chrome.tabs.sendMessage(tab.id, {
+        type: "CL_AUTOFILL",
+        profile: profileData.profile,
+        supplemental: profileData.supplemental,
+      });
+    }
+
+    let response;
+    try {
+      response = await sendAutofill();
+    } catch (err) {
+      if (err?.message?.includes("Receiving end does not exist") || err?.message?.includes("Could not establish connection")) {
+        // Content script not running — inject it now and retry
+        await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["content.js"] });
+        await new Promise((r) => setTimeout(r, 300));
+        response = await sendAutofill();
+      } else {
+        throw err;
+      }
+    }
 
     // Always save the job being applied to, regardless of fill success
     if (response?.jobInfo) {
