@@ -286,10 +286,12 @@
     let title = "", company = "", location = "", description = "", jobUrl = window.location.href;
 
     if (isIndeed) {
-      // ── Indeed job search results (split panel) ────────────────────────────
+      // ── Indeed job search results OR Indeed Apply ─────────────────────────
       const panel =
         document.querySelector('[data-testid="jobsearch-JobInfoHeader-title"]') ||
         document.querySelector(".jobsearch-JobInfoHeader-title") ||
+        document.querySelector('[data-testid="job-title"]') ||
+        document.querySelector(".ia-JobInfoHeader-title") ||
         document.querySelector('[class*="jobTitle"] h1') ||
         document.querySelector('[class*="JobInfoHeader"] h1') ||
         document.querySelector("h1.icl-u-xs-mb--xs");
@@ -300,6 +302,8 @@
       const companyEl =
         document.querySelector('[data-testid="inlineHeader-companyName"] a') ||
         document.querySelector('[data-testid="inlineHeader-companyName"]') ||
+        document.querySelector('[data-testid="company-name"]') ||
+        document.querySelector(".ia-JobInfoHeader-company") ||
         document.querySelector('[class*="companyName"]') ||
         document.querySelector(".jobsearch-CompanyInfoWithoutHeaderImage");
       company = companyEl?.textContent?.trim() || "";
@@ -362,8 +366,14 @@
       title = h1?.textContent?.trim() || document.title.replace(/\s*[-|–]\s*.*$/, "").trim();
     }
     if (!company) {
-      const el = document.querySelector('[class*="company"], [class*="employer"], [class*="Employer"]');
+      const el = document.querySelector('[class*="company"], [class*="employer"], [class*="Employer"], [data-testid="company-name"]');
       company = el?.textContent?.trim() || "";
+      
+      // Fallback: Try to get company from title if it's "Job Title - Company Name"
+      if (!company && document.title.includes(" - ")) {
+        const parts = document.title.split(" - ");
+        if (parts.length > 1) company = parts[parts.length - 1].trim();
+      }
     }
     if (!location) {
       const el = document.querySelector('[class*="location"], [class*="Location"]');
