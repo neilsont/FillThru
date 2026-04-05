@@ -161,13 +161,14 @@ body {
 }
 .btn-icon:hover { color: var(--charcoal); background: var(--pearl); }
 
-/* ── Profile row ───────────────────────────────────────────────────────── */
-.profile-row {
+/* ── User row ──────────────────────────────────────────────────────────── */
+.user-row {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 0;
 }
+.user-info { flex: 1; min-width: 0; }
+.user-actions { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
 .avatar {
   width: 32px;
   height: 32px;
@@ -181,8 +182,10 @@ body {
   font-weight: 600;
   flex-shrink: 0;
 }
-.profile-name { font-weight: 600; font-size: 13px; }
-.profile-email { font-size: 11px; color: var(--slate); }
+.profile-name { font-weight: 600; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.resume-status { font-size: 11px; margin-top: 1px; }
+.resume-status.resume-ok   { color: var(--green); }
+.resume-status.resume-none { color: var(--slate); }
 
 /* ── Divider ───────────────────────────────────────────────────────────── */
 .divider {
@@ -258,17 +261,3 @@ body {
 .alert-item .alert-company { font-weight: 600; font-size: 12px; margin-bottom: 2px; }
 .alert-item .alert-detail  { color: var(--slate); }
 
-/* ── Profile summary ───────────────────────────────────────────────────── */
-.profile-summary {
-  background: var(--white);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 10px;
-  margin-bottom: 0;
-}
-.profile-field { display: flex; gap: 8px; margin-bottom: 4px; font-size: 12px; }
-.profile-field:last-child { margin-bottom: 0; }
-.profile-key   { color: var(--slate); min-width: 70px; flex-shrink: 0; }
-.profile-val   { color: var(--charcoal); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.skill-chips   { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
-.skill-chip    { background: var(--pearl); border: 1px solid var(--border); border-radius: 4px; padding: 1px 6px; font-size: 10px; color: var(--charcoal); }

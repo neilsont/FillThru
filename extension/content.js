@@ -285,6 +285,25 @@
     return { title, company, location, url: window.location.href };
   }
 
+  // ── Standard HTML autocomplete → field name map ───────────────────────────
+  // Checked BEFORE label text so sites that use correct autocomplete attrs
+  // are matched reliably (e.g. Indeed's zip field uses autocomplete="postal-code")
+
+  const AUTOCOMPLETE_FIELD_MAP = {
+    "given-name":    "first_name",
+    "additional-name": "first_name",
+    "family-name":   "last_name",
+    "name":          "full_name",
+    "email":         "email",
+    "tel":           "phone",
+    "tel-national":  "phone",
+    "street-address":"location",
+    "address-line1": "location",
+    "address-level2":"location",  // city
+    "postal-code":   "zip_code",
+    "url":           "website",
+  };
+
   // ── Main fill routine ──────────────────────────────────────────────────────
 
   function autofill(profile, supplemental) {
@@ -298,8 +317,10 @@
     for (const input of inputs) {
       if (!isVisible(input)) continue;
 
-      const labelText = getFieldLabel(input);
-      const fieldName = matchField(labelText);
+      // 1. Prefer explicit autocomplete attribute — more reliable than label text
+      const autoComplete = input.getAttribute("autocomplete");
+      const fieldName = (autoComplete && AUTOCOMPLETE_FIELD_MAP[autoComplete])
+        || matchField(getFieldLabel(input));
       if (!fieldName) continue;
 
       const value = getValue(fieldName, profile, supplemental);

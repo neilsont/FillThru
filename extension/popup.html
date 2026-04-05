@@ -41,15 +41,22 @@
 
     <!-- Main view (logged in) -->
     <div id="view-main" class="view" style="display:none">
-      <div class="profile-row">
+
+      <!-- User row -->
+      <div class="user-row">
         <div class="avatar" id="avatar-initials">–</div>
-        <div>
+        <div class="user-info">
           <div class="profile-name" id="profile-name">Loading…</div>
-          <div class="profile-email" id="profile-email"></div>
+          <div id="resume-status" class="resume-status resume-none">Checking resume…</div>
         </div>
-        <button id="btn-logout" class="btn-icon" title="Sign out">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-        </button>
+        <div class="user-actions">
+          <a id="open-dashboard" href="#" target="_blank" class="btn-icon" title="Open Dashboard">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+          </a>
+          <button id="btn-logout" class="btn-icon" title="Sign out">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          </button>
+        </div>
       </div>
 
       <div class="divider"></div>
@@ -73,7 +80,7 @@
       <!-- Alerts -->
       <div class="section">
         <div class="section-header">
-          <div class="section-title">Alerts needing your attention</div>
+          <div class="section-title">Alerts</div>
           <div id="alert-count" class="badge badge-warn" style="display:none">0</div>
         </div>
         <div id="alerts-list" class="alerts-list">
@@ -81,20 +88,7 @@
         </div>
       </div>
 
-      <div class="divider"></div>
-
-      <!-- Profile summary -->
-      <div class="section">
-        <div class="section-title">Profile</div>
-        <div id="profile-summary" class="profile-summary">
-          <div class="hint">Loading profile…</div>
-        </div>
-        <a id="open-dashboard" href="#" class="btn btn-outline" target="_blank">
-          Open Dashboard ↗
-        </a>
-      </div>
     </div>
-
   </div>
   <script src="popup.js"></script>
 </body>

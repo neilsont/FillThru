@@ -16,10 +16,9 @@ const statusDot     = document.getElementById("status-dot");
 const autofillBadge = document.getElementById("autofill-badge");
 const fillResult    = document.getElementById("fill-result");
 const pageHost      = document.getElementById("page-host");
-const profileName   = document.getElementById("profile-name");
-const profileEmail  = document.getElementById("profile-email");
+const profileName    = document.getElementById("profile-name");
+const resumeStatus   = document.getElementById("resume-status");
 const avatarInitials = document.getElementById("avatar-initials");
-const profileSummary = document.getElementById("profile-summary");
 const openDashboard  = document.getElementById("open-dashboard");
 const alertsList    = document.getElementById("alerts-list");
 const alertCount    = document.getElementById("alert-count");
@@ -134,24 +133,15 @@ function renderProfile(profile, email) {
   const p = profile?.personal ?? {};
   const name = p.name || email?.split("@")[0] || "You";
   profileName.textContent = name;
-  profileEmail.textContent = email ?? "";
   avatarInitials.textContent = name.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase() || "?";
 
-  const skills = profile?.skills?.slice(0, 10) ?? [];
-  profileSummary.innerHTML = `
-    ${p.name ? `<div class="profile-field"><span class="profile-key">Name</span><span class="profile-val">${p.name}</span></div>` : ""}
-    ${p.email ? `<div class="profile-field"><span class="profile-key">Email</span><span class="profile-val">${p.email}</span></div>` : ""}
-    ${p.phone ? `<div class="profile-field"><span class="profile-key">Phone</span><span class="profile-val">${p.phone}</span></div>` : ""}
-    ${p.location ? `<div class="profile-field"><span class="profile-key">Location</span><span class="profile-val">${p.location}</span></div>` : ""}
-    ${p.linkedin ? `<div class="profile-field"><span class="profile-key">LinkedIn</span><span class="profile-val">${p.linkedin}</span></div>` : ""}
-    ${skills.length > 0 ? `
-      <div class="profile-field" style="flex-direction:column; align-items:flex-start;">
-        <span class="profile-key" style="margin-bottom:4px;">Skills</span>
-        <div class="skill-chips">${skills.map((s) => `<span class="skill-chip">${s}</span>`).join("")}</div>
-      </div>
-    ` : ""}
-    ${!p.name && !p.email ? '<div class="hint">No resume uploaded yet. Visit the dashboard to upload.</div>' : ""}
-  `;
+  if (p.name || p.email) {
+    resumeStatus.textContent = "1 resume loaded";
+    resumeStatus.className = "resume-status resume-ok";
+  } else {
+    resumeStatus.textContent = "No resume — upload in dashboard";
+    resumeStatus.className = "resume-status resume-none";
+  }
 }
 
 function showFillResult(type, msg) {
