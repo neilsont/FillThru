@@ -1,5 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
-import { parseResumeText } from "@/lib/anthropic/resume-parser";
+import { parseResumeText } from "@/lib/ai";
+import type { AIModel } from "@/lib/ai/types";
+import { DEFAULT_MODEL } from "@/lib/ai/types";
 import { NextResponse } from "next/server";
 export const maxDuration = 60;
 
@@ -55,6 +57,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "File size must be under 10MB" }, { status: 400 });
     }
 
+    const model = (formData.get("model") as AIModel | null) ?? DEFAULT_MODEL;
     const isPDF = file.type === "application/pdf";
     const ext = isPDF ? "pdf" : "docx";
     const buffer = Buffer.from(await file.arrayBuffer());
@@ -97,7 +100,7 @@ export async function POST(request: Request) {
     // Parse with Claude AI
     let parsedJson;
     try {
-      parsedJson = await parseResumeText(rawText);
+      parsedJson = await parseResumeText(rawText, model);
     } catch (aiError) {
       console.error("AI parsing error:", aiError);
       return NextResponse.json({ error: "Failed to analyze resume with AI. Please try again." }, { status: 500 });

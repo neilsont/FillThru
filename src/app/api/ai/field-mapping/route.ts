@@ -1,6 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
-import { mapApplicationFields } from "@/lib/anthropic/field-mapper";
+import { mapApplicationFields } from "@/lib/ai";
 import type { ParsedResume } from "@/types/resume";
+import type { AIModel } from "@/lib/ai/types";
+import { DEFAULT_MODEL } from "@/lib/ai/types";
 import { NextResponse } from "next/server";
 
 export async function POST(request: Request) {
@@ -14,7 +16,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { job_id } = await request.json();
+    const { job_id, model = DEFAULT_MODEL } = await request.json();
 
     // Fetch job
     const { data: job } = await supabase
@@ -53,7 +55,8 @@ export async function POST(request: Request) {
     const mappings = await mapApplicationFields(
       job.description || "",
       resumeRow.parsed_json as unknown as ParsedResume,
-      supplemental
+      supplemental,
+      model as AIModel
     );
 
     // Flag low-confidence fields

@@ -23,6 +23,7 @@
     "lucide-react": "^1.7.0",
     "mammoth": "^1.12.0",
     "next": "16.2.2",
+    "openai": "^6.33.0",
     "pdf-parse": "^1.1.1",
     "pdfjs-dist": "^4.7.432",
     "react": "19.2.4",

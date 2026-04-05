@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useAIStore } from "@/stores/ai-store";
 import type { ParsedResume } from "@/types/resume";
 
 export function useResume() {
@@ -17,10 +18,12 @@ export function useResume() {
 
 export function useUploadResume() {
   const queryClient = useQueryClient();
+  const { selectedModel } = useAIStore();
   return useMutation({
     mutationFn: async (file: File) => {
       const formData = new FormData();
       formData.append("file", file);
+      formData.append("model", selectedModel);
       const res = await fetch("/api/resume/upload", {
         method: "POST",
         body: formData,

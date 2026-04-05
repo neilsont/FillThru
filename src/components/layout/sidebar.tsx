@@ -33,7 +33,7 @@ export function Sidebar() {
       )}
     >
       <Link
-        href="/dashboard"
+        href="/"
         className="flex items-center gap-2.5 px-4 h-14 border-b border-white/10 hover:bg-sidebar-accent/40 transition-colors"
       >
         <Rocket className="h-5 w-5 text-indigo-400 shrink-0" />
