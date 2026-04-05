@@ -162,4 +162,18 @@
   .stagger-1 { animation-delay: 0.1s; }
   .stagger-2 { animation-delay: 0.2s; }
   .stagger-3 { animation-delay: 0.3s; }
+
+  /* ── Marquee Animation ─────────────────────────────────────────────────── */
+  .animate-marquee {
+    animation: marquee 30s linear infinite;
+  }
+
+  @keyframes marquee {
+    from { transform: translateX(0); }
+    to { transform: translateX(-50%); }
+  }
+
+  .mask-edges {
+    mask-image: linear-gradient(to right, transparent, black 15%, black 85%, transparent);
+  }
 }

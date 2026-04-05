@@ -94,15 +94,54 @@ export default async function HomePage() {
               </Button>
             </div>
             
-            {/* Social Proof Placeholder */}
-            <div className="mt-16 pt-8 border-t border-border/20 stagger-3">
-              <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground/60 mb-6">Optimized for top job boards</p>
-              <div className="flex flex-wrap justify-center items-center gap-10 opacity-40 grayscale contrast-125">
-                <span className="font-bold text-xl">Indeed</span>
-                <span className="font-bold text-xl">LinkedIn</span>
-                <span className="font-bold text-xl">Greenhouse</span>
-                <span className="font-bold text-xl">Lever</span>
-                <span className="font-bold text-xl">Workday</span>
+            {/* University Marquee Section */}
+            <div className="mt-20 pt-10 border-t border-border/20 stagger-3 overflow-hidden">
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/50 mb-10">Trusted by students from</p>
+              
+              <div className="relative w-full overflow-hidden mask-edges py-2">
+                <div className="flex w-fit items-center gap-16 whitespace-nowrap animate-marquee">
+                  {[
+                    "Harvard University", 
+                    "MIT", 
+                    "Yale", 
+                    "Stanford", 
+                    "UT Austin", 
+                    "Princeton", 
+                    "Columbia", 
+                    "UC Berkeley", 
+                    "Georgia Tech",
+                    "Cornell",
+                    "University of Michigan",
+                    "Oxbridge"
+                  ].map((uni, index) => (
+                    <div key={index} className="flex items-center gap-2 group cursor-default">
+                      <span className="text-xl md:text-2xl font-bold tracking-tight text-primary/30 group-hover:text-accent/60 transition-colors duration-300 select-none uppercase italic">
+                        {uni}
+                      </span>
+                    </div>
+                  ))}
+                  {/* Duplicate for infinite loop */}
+                  {[
+                    "Harvard University", 
+                    "MIT", 
+                    "Yale", 
+                    "Stanford", 
+                    "UT Austin", 
+                    "Princeton", 
+                    "Columbia", 
+                    "UC Berkeley", 
+                    "Georgia Tech",
+                    "Cornell",
+                    "University of Michigan",
+                    "Oxbridge"
+                  ].map((uni, index) => (
+                    <div key={`dup-${index}`} className="flex items-center gap-2 group cursor-default">
+                      <span className="text-xl md:text-2xl font-bold tracking-tight text-primary/30 group-hover:text-accent/60 transition-colors duration-300 select-none uppercase italic">
+                        {uni}
+                      </span>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
