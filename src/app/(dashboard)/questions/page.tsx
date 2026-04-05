@@ -41,6 +41,23 @@ export default function QuestionsPage() {
     }
   };
 
+  const [isDismissingAll, setIsDismissingAll] = useState(false);
+
+  const handleDismissAll = async () => {
+    if (!questions?.length) return;
+    if (!confirm(`Are you sure you want to dismiss all ${questions.length} questions?`)) return;
+
+    setIsDismissingAll(true);
+    try {
+      await resolveMutation.mutateAsync({ ids: questions.map((q) => q.id) });
+      toast({ title: `Dismissed all ${questions.length} questions` });
+    } catch {
+      toast({ title: "Failed to dismiss all questions", variant: "destructive" });
+    } finally {
+      setIsDismissingAll(false);
+    }
+  };
+
   const handleDismiss = async (id: string) => {
     setSaving((s) => ({ ...s, [id]: true }));
     try {
@@ -68,10 +85,26 @@ export default function QuestionsPage() {
 
   return (
     <div>
-      <PageHeader title="Pending Questions" description="Questions that need your input to complete applications">
-        {questions && questions.length > 0 && (
-          <Badge variant="warning">{questions.length} pending</Badge>
-        )}
+      <PageHeader 
+        title="Pending Questions" 
+        description="Questions that need your input to complete applications"
+      >
+        <div className="flex items-center gap-3">
+          {questions && questions.length > 0 && (
+            <>
+              <Badge variant="warning">{questions.length} pending</Badge>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={handleDismissAll}
+                disabled={isDismissingAll}
+              >
+                {isDismissingAll ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-2" /> : <X className="h-3.5 w-3.5 mr-2" />}
+                Dismiss All
+              </Button>
+            </>
+          )}
+        </div>
       </PageHeader>
 
       {!questions?.length ? (

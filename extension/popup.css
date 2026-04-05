@@ -12,19 +12,24 @@
   --white: #ffffff;
   --red: #c0392b;
   --green: #1a6645;
+  --ai-purple: #7c4dff;
+  --ai-purple-light: #f3f0ff;
   --radius: 6px;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
-  width: 340px;
-  min-height: 200px;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
   background: var(--ivory);
   color: var(--charcoal);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-size: 13px;
   line-height: 1.4;
+  overflow-x: hidden;
 }
 
 /* ── Header ────────────────────────────────────────────────────────────── */
@@ -34,6 +39,14 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  height: 48px;
+  -webkit-app-region: drag; /* For future electron/native desktop use, but here it helps mark the area */
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .logo {
@@ -146,6 +159,15 @@ body {
   font-weight: 500;
 }
 .btn-google:hover:not(:disabled) { background: var(--pearl); }
+
+.btn-ai {
+  background: var(--ai-purple);
+  color: var(--white);
+}
+.btn-ai:hover:not(:disabled) { opacity: 0.9; }
+.btn-ai:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.badge-ai { background: var(--ai-purple); color: var(--white); }
 
 .btn-icon {
   background: none;

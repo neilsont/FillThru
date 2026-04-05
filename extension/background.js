@@ -44,7 +44,7 @@ function showNotification(alert) {
 
 // ── Listen for messages from content script / popup ───────────────────────
 
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "CL_STORE_ALERT") {
     storeAlert(message.alert).then(() => sendResponse({ ok: true }));
     return true;
@@ -64,12 +64,72 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     });
     return true;
   }
+
+  // ── Relay Logic for Injected Overlay ──
+
+  if (message.type === "CL_RELAY_TO_CONTENT") {
+    const tabId = sender.tab?.id;
+    if (tabId) {
+      chrome.tabs.sendMessage(tabId, message.payload).then(sendResponse);
+      return true; // async response from content script
+    }
+    sendResponse({ error: "No active tab context" });
+    return false;
+  }
+
+  if (message.type === "CL_GET_CURRENT_TAB_INFO") {
+    if (sender.tab) {
+      sendResponse({ url: sender.tab.url, title: sender.tab.title });
+    } else {
+      // Fallback: This might happen if called from outside a tab context
+      chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
+        if (tab) sendResponse({ url: tab.url, title: tab.title });
+        else sendResponse(null);
+      });
+      return true;
+    }
+    return false;
+  }
+
+  if (message.type === "CL_TOGGLE_SELF") {
+    const tabId = sender.tab?.id;
+    if (tabId) {
+      chrome.tabs.sendMessage(tabId, { type: "CL_TOGGLE_OVERLAY" }).then(sendResponse);
+      return true;
+    }
+    sendResponse({ error: "No active tab context" });
+    return false;
+  }
 });
 
 // ── On install ────────────────────────────────────────────────────────────
 
 chrome.runtime.onInstalled.addListener(() => {
   setActionBadge("", null);
+});
+
+// ── Action (Icon Click) ───────────────────────────────────────────────────
+
+chrome.action.onClicked.addListener(async (tab) => {
+  // If the browser UI can't be injected (e.g. chrome:// or edge:// pages), skip
+  if (!tab.url || tab.url.startsWith("chrome://") || tab.url.startsWith("edge://")) return;
+
+  try {
+    // Send message to content script to toggle the overlay
+    await chrome.tabs.sendMessage(tab.id, { type: "CL_TOGGLE_OVERLAY" });
+  } catch (err) {
+    // Content script might not be injected yet. Inject it and retry.
+    if (err.message.includes("Could not establish connection") || err.message.includes("Receiving end does not exist")) {
+      await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        files: ["content.js"]
+      });
+      // Wait a bit for initialization
+      setTimeout(() => {
+        chrome.tabs.sendMessage(tab.id, { type: "CL_TOGGLE_OVERLAY" }).catch(() => {});
+      }, 200);
+    }
+  }
 });
 
 // ── Init ─────────────────────────────────────────────────────────────────

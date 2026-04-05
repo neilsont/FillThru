@@ -18,7 +18,12 @@
         </svg>
         <span class="logo-text">CareerLaunch</span>
       </div>
-      <div id="status-dot" class="status-dot offline" title="Not connected"></div>
+      <div class="header-right">
+        <div id="status-dot" class="status-dot offline" title="Not connected"></div>
+        <button id="btn-close" class="btn-icon" title="Close">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
     </header>
 
     <!-- Login view -->
@@ -73,6 +78,22 @@
           Fill Application
         </button>
         <div id="fill-result" class="fill-result" style="display:none"></div>
+      </div>
+
+      <!-- Magic Cover Letter (Shown if a cover letter field is detected) -->
+      <div id="cover-letter-section" style="display:none">
+        <div class="divider"></div>
+        <div class="section">
+          <div class="section-header">
+            <div class="section-title">Magic Cover Letter</div>
+            <div class="badge badge-ai">✨ AI</div>
+          </div>
+          <p class="hint">We detected a cover letter field. Let AI write a tailored response for you.</p>
+          <button id="btn-magic-letter" class="btn btn-ai">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14l-5-4.87 6.91-1.01L12 2z"/></svg>
+            Write with AI
+          </button>
+        </div>
       </div>
 
       <!-- Missing supplemental fields (shown after autofill detects unanswered questions) -->

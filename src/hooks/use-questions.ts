@@ -19,12 +19,14 @@ export function useResolveQuestion() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (data: {
-      id: string;
+      id?: string;
+      ids?: string[];
       answer?: string;
       saveToSupplemental?: boolean;
     }) => {
+      const isBatch = !!data.ids;
       const res = await fetch("/api/questions", {
-        method: "PUT",
+        method: isBatch ? "PATCH" : "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });

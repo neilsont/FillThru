@@ -30,45 +30,85 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: CORS_HEADERS });
     }
 
-    const { title, company, url, location, description } = await request.json();
+    const { title, company, url, location, description, filled_fields } = await request.json();
 
     if (!url) {
       return NextResponse.json({ error: "url is required" }, { status: 400, headers: CORS_HEADERS });
     }
 
-    // Check if this job URL is already saved
-    const { data: existing } = await supabase
+    // Step 1: Handle Job record
+    let jobId: string;
+    const { data: existingJob } = await supabase
       .from("jobs")
-      .select("id, title, company, status")
+      .select("id")
       .eq("user_id", user.id)
       .eq("url", url)
       .maybeSingle();
 
-    if (existing) {
-      return NextResponse.json({ job: existing, created: false }, { headers: CORS_HEADERS });
+    if (existingJob) {
+      jobId = existingJob.id;
+      // Update job status to in_progress if it was just 'discovered'
+      await supabase
+        .from("jobs")
+        .update({ status: "in_progress", updated_at: new Date().toISOString() })
+        .eq("id", jobId)
+        .eq("status", "discovered");
+    } else {
+      const { data: newJob, error: jobError } = await supabase
+        .from("jobs")
+        .insert({
+          user_id: user.id,
+          title: title || "Job Application",
+          company: company || "Unknown Company",
+          location: location || null,
+          description: description || null,
+          url,
+          source: "extension",
+          status: "in_progress",
+        })
+        .select("id")
+        .single();
+
+      if (jobError) return NextResponse.json({ error: jobError.message }, { status: 500, headers: CORS_HEADERS });
+      jobId = newJob.id;
     }
 
-    // Save new job with status "in_progress" since the user is actively applying
-    const { data: job, error } = await supabase
-      .from("jobs")
-      .insert({
-        user_id: user.id,
-        title: title || "Job Application",
-        company: company || "Unknown Company",
-        location: location || null,
-        description: description || null,
-        url,
-        source: "extension",
-        status: "in_progress",
-      })
-      .select()
-      .single();
+    // Step 2: Handle Application record (tracking "Applications adding to CareerLaunch Applications")
+    const { data: existingApp } = await supabase
+      .from("applications")
+      .select("id, status")
+      .eq("user_id", user.id)
+      .eq("job_id", jobId)
+      .maybeSingle();
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500, headers: CORS_HEADERS });
+    if (existingApp) {
+      // Update fields if they were passed (even for existing application)
+      if (filled_fields) {
+        await supabase
+          .from("applications")
+          .update({
+            filled_fields_json: filled_fields,
+            updated_at: new Date().toISOString()
+          })
+          .eq("id", existingApp.id);
+      }
+    } else {
+      const { error: appError } = await supabase
+        .from("applications")
+        .insert({
+          user_id: user.id,
+          job_id: jobId,
+          status: "draft",
+          filled_fields_json: filled_fields || {},
+        });
+      
+      if (appError) {
+        console.error("Failed to create application record:", appError);
+        // We continue because the job was saved, which is the primary goal
+      }
     }
 
-    return NextResponse.json({ job, created: true }, { headers: CORS_HEADERS });
+    return NextResponse.json({ job: { id: jobId }, created: !existingJob }, { headers: CORS_HEADERS });
   } catch (error) {
     console.error("Extension save-job error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500, headers: CORS_HEADERS });

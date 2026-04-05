@@ -23,10 +23,46 @@ const openDashboard  = document.getElementById("open-dashboard");
 const missingSection = document.getElementById("missing-section");
 const missingFields  = document.getElementById("missing-fields");
 const btnSaveFill    = document.getElementById("btn-save-fill");
+const btnClose       = document.getElementById("btn-close");
 const alertsList    = document.getElementById("alerts-list");
 const alertCount    = document.getElementById("alert-count");
+const coverLetterSection = document.getElementById("cover-letter-section");
+const btnMagicLetter     = document.getElementById("btn-magic-letter");
 
 openDashboard.href = BASE_URL + "/dashboard";
+
+// ── Message Relay (Fix for Injected Context) ─────────────────────────────────
+
+async function relayToContent(payload) {
+  try {
+    return await chrome.runtime.sendMessage({ type: "CL_RELAY_TO_CONTENT", payload });
+  } catch (err) {
+    console.error("Relay failed:", err);
+    return null;
+  }
+}
+
+async function getTabInfo() {
+  return await chrome.runtime.sendMessage({ type: "CL_GET_CURRENT_TAB_INFO" });
+}
+
+// ── Automatic Job Discovery ──────────────────────────────────────────────────
+
+async function discoverJob(token) {
+  try {
+    const response = await relayToContent({ type: "CL_PING" });
+    if (response?.ok) {
+      // Content script is active, let's try to extract job info
+      const info = await relayToContent({ type: "CL_EXTRACT_JOB" });
+      if (info?.title && info?.url) {
+        // Auto-save discovered job as 'discovered' status
+        await saveJobToCareerLaunch(token, info);
+      }
+    }
+  } catch (err) {
+    // Silent fail for discovery
+  }
+}
 
 // ── PKCE helpers ──────────────────────────────────────────────────────────────
 
@@ -156,18 +192,11 @@ function showFillResult(type, msg) {
   fillResult.textContent = msg;
 }
 
-// ── Current tab info ───────────────────────────────────────────────────────────
-
-async function getCurrentTab() {
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  return tab;
-}
-
 async function updatePageInfo() {
   try {
-    const tab = await getCurrentTab();
-    if (tab?.url) {
-      const url = new URL(tab.url);
+    const info = await getTabInfo();
+    if (info?.url) {
+      const url = new URL(info.url);
       pageHost.textContent = `Current page: ${url.hostname}`;
     } else {
       pageHost.textContent = "No active page";
@@ -216,8 +245,7 @@ function showMissingInfo(skippedFields, token) {
       }
       // Re-fetch profile and re-fill the page
       const updated = await fetchProfile(token);
-      const tab = await getCurrentTab();
-      await chrome.tabs.sendMessage(tab.id, {
+      await relayToContent({
         type: "CL_AUTOFILL",
         profile: updated.profile,
         supplemental: updated.supplemental,
@@ -248,35 +276,24 @@ async function runAutofill() {
 
   try {
     const profileData = await fetchProfile(access_token);
-    const tab = await getCurrentTab();
 
-    // Send message to content script; if not injected yet, inject it and retry
+    // Send message to content script via background relay
     async function sendAutofill() {
-      return chrome.tabs.sendMessage(tab.id, {
+      return await relayToContent({
         type: "CL_AUTOFILL",
         profile: profileData.profile,
         supplemental: profileData.supplemental,
       });
     }
 
-    let response;
-    try {
-      response = await sendAutofill();
-    } catch (err) {
-      if (err?.message?.includes("Receiving end does not exist") || err?.message?.includes("Could not establish connection")) {
-        // Content script not running — inject it now and retry
-        await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["content.js"] });
-        await new Promise((r) => setTimeout(r, 300));
-        response = await sendAutofill();
-      } else {
-        throw err;
-      }
-    }
+    let response = await sendAutofill();
 
     // Always save the job to CareerLaunch when Fill Application is clicked
     let savedJob = null;
     if (response?.jobInfo?.url) {
-      const saveResult = await saveJobToCareerLaunch(access_token, response.jobInfo);
+      // Collect filled fields to store in the application record
+      const filledFields = response.filled_fields ?? {}; // I need to make sure autofill returns this
+      const saveResult = await saveJobToCareerLaunch(access_token, response.jobInfo, filledFields);
       savedJob = saveResult;
     }
 
@@ -300,6 +317,13 @@ async function runAutofill() {
       showFillResult("warn", "No fields were filled. This page may require manual input.");
     }
 
+    // Show magic cover letter button if a field was detected
+    if (response?.coverLetterFound) {
+      coverLetterSection.style.display = "block";
+    } else {
+      coverLetterSection.style.display = "none";
+    }
+
     // Show missing supplemental fields so user can answer from the popup
     showMissingInfo(response?.skippedFields ?? [], access_token);
 
@@ -318,7 +342,7 @@ async function runAutofill() {
   }
 }
 
-async function saveJobToCareerLaunch(token, jobInfo) {
+async function saveJobToCareerLaunch(token, jobInfo, filledFields = null) {
   try {
     const res = await fetch(`${BASE_URL}/api/extension/save-job`, {
       method: "POST",
@@ -326,7 +350,7 @@ async function saveJobToCareerLaunch(token, jobInfo) {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${token}`,
       },
-      body: JSON.stringify(jobInfo),
+      body: JSON.stringify({ ...jobInfo, filled_fields: filledFields }),
     });
     if (res.ok) return res.json(); // { job, created }
   } catch {
@@ -379,6 +403,8 @@ async function init() {
       const data = await fetchProfile(access_token);
       showMainView(data, user_email);
       setStatus(true);
+      // Run automatic job discovery
+      discoverJob(access_token);
     } catch {
       await clearAuth();
       showLoginView();
@@ -403,6 +429,11 @@ function showMainView(profileData, email) {
 }
 
 // ── Event listeners ────────────────────────────────────────────────────────────
+
+btnClose.addEventListener("click", () => {
+  // Tell background script to toggle the overlay in our current tab
+  chrome.runtime.sendMessage({ type: "CL_TOGGLE_SELF" });
+});
 
 btnLogin.addEventListener("click", async () => {
   loginError.style.display = "none";
@@ -442,3 +473,53 @@ btnAutofill.addEventListener("click", runAutofill);
 
 // ── Boot ───────────────────────────────────────────────────────────────────────
 init();
+// ── Magic Cover Letter ──────────────────────────────────────────────────────
+
+btnMagicLetter.addEventListener("click", async () => {
+  const token = await chrome.storage.local.get("supabase_token").then(s => s.supabase_token);
+  if (!token) return;
+
+  btnMagicLetter.disabled = true;
+  const originalText = btnMagicLetter.innerHTML;
+  btnMagicLetter.innerHTML = `<span class="spinner"></span> Writing...`;
+
+  try {
+    // 1. Get job info from page
+    const info = await relayToContent({ type: "CL_EXTRACT_JOB" });
+    if (!info) throw new Error("Could not extract job info");
+
+    // 2. Call API to generate
+    const response = await fetch(`${BASE_URL}/api/extension/generate-cover-letter`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        jobTitle: info.title,
+        companyName: info.company,
+        jobDescription: info.description
+      })
+    });
+
+    if (!response.ok) {
+      const err = await response.json();
+      throw new Error(err.error || "Generation failed");
+    }
+
+    const { coverLetter } = await response.json();
+
+    // 3. Fill the field
+    const fillRes = await relayToContent({ type: "CL_FILL_COVER_LETTER", text: coverLetter });
+    if (fillRes?.error) throw new Error(fillRes.error);
+
+    btnMagicLetter.innerHTML = `✨ Letter Generated!`;
+    setTimeout(() => { btnMagicLetter.innerHTML = originalText; btnMagicLetter.disabled = false; }, 3000);
+
+  } catch (err) {
+    console.error("Magic letter error:", err);
+    alert(err.message);
+    btnMagicLetter.innerHTML = originalText;
+    btnMagicLetter.disabled = false;
+  }
+});

@@ -40,6 +40,17 @@
     summary:            [/professional.?summary/i, /brief.?bio/i, /about.?me/i, /bio/i],
   };
 
+  async function simulateTyping(element, text) {
+    element.focus();
+    element.value = "";
+    
+    // Some sites need a value set directly AND an input event
+    element.value = text;
+    element.dispatchEvent(new Event("input", { bubbles: true }));
+    element.dispatchEvent(new Event("change", { bubbles: true }));
+    element.blur();
+  }
+
   // ── Extract value from profile for a given field ──────────────────────────
 
   function getValue(fieldName, profile, supplemental) {
@@ -342,6 +353,13 @@
       .replace(/\s*[-|–]\s*(indeed|linkedin|glassdoor|google jobs?)$/i, "")
       .trim();
 
+    // Fallback for description: get any large text block if id failed
+    if (!description || description.length < 100) {
+      const main = document.querySelector("main") || document.body;
+      const paragraphs = Array.from(main.querySelectorAll("p, li")).map(p => p.textContent.trim());
+      description = paragraphs.join("\n").slice(0, 3000);
+    }
+
     return { title, company, location, description, url: jobUrl };
   }
 
@@ -379,7 +397,9 @@
 
     let filled = 0;
     let skipped = 0;
+    let coverLetterFound = false;
     const skippedFields = [];   // supplemental fields found on page but missing a saved answer
+    const filledFields = {};    // track what we actually filled
     const seenKeys = new Set();
 
     for (const input of inputs) {
@@ -387,8 +407,11 @@
 
       // 1. Prefer explicit autocomplete attribute — more reliable than label text
       const autoComplete = input.getAttribute("autocomplete");
+      const label = getFieldLabel(input);
       const fieldName = (autoComplete && AUTOCOMPLETE_FIELD_MAP[autoComplete])
-        || matchField(getFieldLabel(input));
+        || matchField(label);
+
+      if (fieldName === "cover_letter") coverLetterFound = true;
       if (!fieldName) continue;
 
       const value = getValue(fieldName, profile, supplemental);
@@ -397,7 +420,7 @@
         // Capture supplemental fields so the popup can ask the user to fill them in
         if (SUPPLEMENTAL_KEYS.has(fieldName) && !seenKeys.has(fieldName)) {
           seenKeys.add(fieldName);
-          const rawLabel = getFieldLabel(input).split(/[\n\r]/)[0].trim().slice(0, 100);
+          const rawLabel = (label || "").split(/[\n\r]/)[0].trim().slice(0, 100);
           const pageLabel = rawLabel || fieldName.replace(/_/g, " ");
           const isSelect = input.tagName.toLowerCase() === "select";
           const options = isSelect
@@ -411,14 +434,171 @@
       }
 
       const didFill = fillInput(input, value);
-      if (didFill) filled++;
+      if (didFill) {
+        filled++;
+        filledFields[fieldName] = value;
+      }
     }
 
     const blockerAlerts = detectBlockers();
     const unknownAlerts = filled === 0 ? [] : detectUnknownFields(filled);
     const jobInfo = extractJobInfo();
 
-    return { filled, skipped, skippedFields, alerts: [...blockerAlerts, ...unknownAlerts], no_fields: inputs.length === 0, jobInfo };
+    return { filled, skipped, skippedFields, filled_fields: filledFields, alerts: [...blockerAlerts, ...unknownAlerts], no_fields: inputs.length === 0, jobInfo, coverLetterFound };
+  }
+
+  // ── Overlay Injection & State ─────────────────────────────────────────────
+  let overlayContainer = null;
+  let isDragging = false;
+  let dragOffset = { x: 0, y: 0 };
+
+  async function toggleOverlay() {
+    if (overlayContainer) {
+      removeOverlay();
+    } else {
+      await injectOverlay();
+    }
+  }
+
+  async function injectOverlay() {
+    if (overlayContainer) return;
+
+    // Create the host element for Shadow DOM
+    overlayContainer = document.createElement("div");
+    overlayContainer.id = "cl-overlay-root";
+    // Basic styles for the container (will be overridden by position storage if exists)
+    Object.assign(overlayContainer.style, {
+      position: "fixed",
+      top: "20px",
+      right: "20px",
+      width: "360px",
+      height: "560px",
+      zIndex: "2147483647",
+      backgroundColor: "transparent",
+      borderRadius: "12px",
+      boxShadow: "0 10px 30px rgba(0,0,0,0.25)",
+      overflow: "hidden",
+      transition: "opacity 0.2s ease, transform 0.2s ease",
+      userSelect: "none",
+    });
+
+    const shadow = overlayContainer.attachShadow({ mode: "open" });
+
+    // Overlay styles
+    const style = document.createElement("style");
+    style.textContent = `
+      :host { all: initial; }
+      .overlay-frame {
+        width: 100%;
+        height: 100%;
+        border: none;
+        background: #fff;
+        border-radius: 12px;
+      }
+      .drag-handle {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 48px;
+        cursor: grab;
+        z-index: 10;
+        background: transparent;
+      }
+      .drag-handle:active { cursor: grabbing; }
+      .close-btn {
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        width: 24px;
+        height: 24px;
+        background: rgba(0,0,0,0.05);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        z-index: 20;
+        font-family: system-ui;
+        font-size: 14px;
+        color: #666;
+        transition: background 0.2s;
+      }
+      .close-btn:hover { background: rgba(0,0,0,0.1); }
+    `;
+    shadow.appendChild(style);
+
+    // Drag Handle
+    const handle = document.createElement("div");
+    handle.className = "drag-handle";
+    handle.addEventListener("mousedown", startDrag);
+    shadow.appendChild(handle);
+
+    // Close button (redundant but nice if they want to close it)
+    const closeBtn = document.createElement("div");
+    closeBtn.className = "close-btn";
+    closeBtn.innerHTML = "&times;";
+    closeBtn.title = "Close CareerLaunch";
+    closeBtn.onclick = removeOverlay;
+    shadow.appendChild(closeBtn);
+
+    // The Iframe
+    const iframe = document.createElement("iframe");
+    iframe.src = chrome.runtime.getURL("popup.html");
+    iframe.className = "overlay-frame";
+    shadow.appendChild(iframe);
+
+    document.body.appendChild(overlayContainer);
+    
+    // Restore position if saved
+    const { overlayPos } = await chrome.storage.local.get("overlayPos");
+    if (overlayPos) {
+      overlayContainer.style.top = overlayPos.top;
+      overlayContainer.style.right = "auto";
+      overlayContainer.style.left = overlayPos.left;
+    }
+  }
+
+  function removeOverlay() {
+    if (overlayContainer) {
+      overlayContainer.remove();
+      overlayContainer = null;
+    }
+  }
+
+  function startDrag(e) {
+    isDragging = true;
+    const rect = overlayContainer.getBoundingClientRect();
+    dragOffset.x = e.clientX - rect.left;
+    dragOffset.y = e.clientY - rect.top;
+    overlayContainer.style.transition = "none";
+    
+    document.addEventListener("mousemove", onDrag);
+    document.addEventListener("mouseup", stopDrag);
+  }
+
+  function onDrag(e) {
+    if (!isDragging) return;
+    const x = e.clientX - dragOffset.x;
+    const y = e.clientY - dragOffset.y;
+    overlayContainer.style.left = `${x}px`;
+    overlayContainer.style.top = `${y}px`;
+    overlayContainer.style.right = "auto";
+  }
+
+  async function stopDrag() {
+    isDragging = false;
+    document.removeEventListener("mousemove", onDrag);
+    document.removeEventListener("mouseup", stopDrag);
+    overlayContainer.style.transition = "opacity 0.2s ease, transform 0.2s ease";
+    
+    // Save position
+    await chrome.storage.local.set({
+      overlayPos: {
+        left: overlayContainer.style.left,
+        top: overlayContainer.style.top
+      }
+    });
   }
 
   // ── Message listener ───────────────────────────────────────────────────────
@@ -434,6 +614,35 @@
       return true; // async
     }
 
+    if (message.type === "CL_TOGGLE_OVERLAY") {
+      toggleOverlay().then(() => sendResponse({ ok: true }));
+      return true;
+    }
+
+    if (message.type === "CL_EXTRACT_JOB") {
+      try {
+        const info = extractJobInfo();
+        sendResponse(info);
+      } catch (err) {
+        sendResponse(null);
+      }
+      return true;
+    }
+
+    if (message.type === "CL_FILL_COVER_LETTER") {
+      const inputs = document.querySelectorAll("textarea, input:not([type=hidden])");
+      for (const input of inputs) {
+        const label = getFieldLabel(input);
+        if (matchField(label) === "cover_letter") {
+          simulateTyping(input, message.text);
+          sendResponse({ ok: true });
+          return true;
+        }
+      }
+      sendResponse({ error: "No cover letter field found" });
+      return true;
+    }
+
     if (message.type === "CL_PING") {
       sendResponse({ ok: true, url: window.location.href });
       return true;
@@ -441,3 +650,4 @@
   });
 
 })();
+
