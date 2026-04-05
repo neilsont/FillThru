@@ -476,7 +476,7 @@ init();
 // ── Magic Cover Letter ──────────────────────────────────────────────────────
 
 btnMagicLetter.addEventListener("click", async () => {
-  const token = await chrome.storage.local.get("supabase_token").then(s => s.supabase_token);
+  const { access_token: token } = await getStoredAuth();
   if (!token) return;
 
   btnMagicLetter.disabled = true;
