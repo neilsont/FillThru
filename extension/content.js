@@ -287,7 +287,6 @@
 
     if (isIndeed) {
       // ── Indeed job search results (split panel) ────────────────────────────
-      // The selected job detail shows in the right panel
       const panel =
         document.querySelector('[data-testid="jobsearch-JobInfoHeader-title"]') ||
         document.querySelector(".jobsearch-JobInfoHeader-title") ||
@@ -312,7 +311,7 @@
         document.querySelector(".jobsearch-JobInfoHeader-subtitle [class*='location']");
       location = locationEl?.textContent?.trim() || "";
 
-      // Job description text (for context)
+      // Job description text
       const descEl =
         document.querySelector('[id="jobDescriptionText"]') ||
         document.querySelector('[class*="jobsearch-jobDescriptionText"]') ||
@@ -331,9 +330,33 @@
         const jk = new URLSearchParams(window.location.search).get("jk");
         if (jk) jobUrl = `https://www.indeed.com/viewjob?jk=${jk}`;
       }
+    } else {
+      // ── Generic / Greenhouse / Skillsoft ──────────────────────────────────
+      title =
+        document.querySelector("h1.app-title")?.innerText?.trim() ||
+        document.querySelector("h1.neo--jobheading__title")?.innerText?.trim() ||
+        document.querySelector("h1")?.innerText?.trim() ||
+        document.querySelector(".job-title")?.innerText?.trim() ||
+        document.querySelector('[class*="title" i]')?.innerText?.trim() || 
+        "";
+
+      company =
+        document.querySelector('meta[property="og:site_name"]')?.content ||
+        document.querySelector(".company-name")?.innerText?.trim() ||
+        document.querySelector(".company")?.innerText?.trim() ||
+        document.querySelector(".siteHeader__brand img")?.alt ||
+        document.querySelector('[class*="company" i]')?.innerText?.trim() ||
+        "";
+
+      description =
+        document.querySelector("#job-overview")?.innerText?.trim() ||
+        document.querySelector(".description")?.innerText?.trim() ||
+        document.querySelector("#job-description")?.innerText?.trim() ||
+        document.querySelector('[class*="description" i]')?.innerText?.trim() ||
+        "";
     }
 
-    // ── Generic fallback for any site ─────────────────────────────────────────
+    // ── Generic fallback for any site if specific ones failed ─────────────────
     if (!title) {
       const h1 = document.querySelector("h1");
       title = h1?.textContent?.trim() || document.title.replace(/\s*[-|–]\s*.*$/, "").trim();
@@ -345,6 +368,11 @@
     if (!location) {
       const el = document.querySelector('[class*="location"], [class*="Location"]');
       location = el?.textContent?.trim() || "";
+    }
+
+    // Clean up title if it contains company info (e.g. "Software Engineer - Skillsoft")
+    if (title && company && title.toLowerCase().includes(company.toLowerCase())) {
+      title = title.split(/\s*[-|–]\s*/)[0].split(/\s+at\s+/i)[0].trim();
     }
 
     // Clean up titles that say "Apply for X" or have site branding appended
