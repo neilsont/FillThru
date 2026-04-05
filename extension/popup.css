@@ -246,6 +246,24 @@ body {
 .fill-result.error   { background: rgba(192,57,43,0.08); color: var(--red);   border: 1px solid rgba(192,57,43,0.2); }
 .fill-result.warn    { background: rgba(184,148,31,0.08); color: #8a6e10; border: 1px solid rgba(184,148,31,0.2); }
 
+/* ── Missing supplemental fields ──────────────────────────────────────── */
+.missing-fields { display: flex; flex-direction: column; gap: 8px; }
+.missing-field-row { display: flex; flex-direction: column; gap: 3px; }
+.missing-field-label { font-size: 11px; font-weight: 500; color: var(--charcoal); }
+.missing-field-input {
+  width: 100%;
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--white);
+  color: var(--charcoal);
+  font-size: 12px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.missing-field-input:focus { border-color: var(--gold); box-shadow: 0 0 0 2px rgba(184,148,31,0.12); }
+
 /* ── Alerts list ───────────────────────────────────────────────────────── */
 .alerts-list { display: flex; flex-direction: column; gap: 6px; }
 

@@ -15,7 +15,7 @@
     full_name:   [/full.?name/i, /your.?name/i, /applicant.?name/i, /^name$/i],
     email:       [/e.?mail/i, /email.?address/i],
     phone:       [/phone/i, /mobile/i, /cell/i, /telephone/i, /contact.?number/i],
-    location:    [/city/i, /location/i, /address/i, /current.?location/i, /where.?do.?you.?live/i],
+    location:    [/\bcity\b/i, /^location$/i, /current.?location/i, /where.?do.?you.?live/i],
     zip_code:    [/zip/i, /postal.?code/i, /zip.?code/i, /post.?code/i],
     linkedin:    [/linkedin/i, /linked.?in/i, /linkedin.?url/i, /linkedin.?profile/i],
     website:     [/website/i, /portfolio/i, /personal.?site/i, /web.?url/i, /github/i],
@@ -297,14 +297,18 @@
     "email":         "email",
     "tel":           "phone",
     "tel-national":  "phone",
-    "street-address":"location",
-    "address-line1": "location",
-    "address-level2":"location",  // city
+    "address-level2":"location",  // city only — street address intentionally omitted (no street data)
     "postal-code":   "zip_code",
     "url":           "website",
   };
 
   // ── Main fill routine ──────────────────────────────────────────────────────
+
+  // Supplemental-sourced fields — these can be answered from the popup
+  const SUPPLEMENTAL_KEYS = new Set([
+    "zip_code", "salary_expectation", "work_authorization", "sponsorship_needed",
+    "willing_to_relocate", "gender", "veteran_status", "disability_status", "ethnicity",
+  ]);
 
   function autofill(profile, supplemental) {
     const inputs = document.querySelectorAll(
@@ -313,6 +317,8 @@
 
     let filled = 0;
     let skipped = 0;
+    const skippedFields = [];   // supplemental fields found on page but missing a saved answer
+    const seenKeys = new Set();
 
     for (const input of inputs) {
       if (!isVisible(input)) continue;
@@ -324,7 +330,23 @@
       if (!fieldName) continue;
 
       const value = getValue(fieldName, profile, supplemental);
-      if (!value) { skipped++; continue; }
+      if (!value) {
+        skipped++;
+        // Capture supplemental fields so the popup can ask the user to fill them in
+        if (SUPPLEMENTAL_KEYS.has(fieldName) && !seenKeys.has(fieldName)) {
+          seenKeys.add(fieldName);
+          const rawLabel = getFieldLabel(input).split(/[\n\r]/)[0].trim().slice(0, 100);
+          const pageLabel = rawLabel || fieldName.replace(/_/g, " ");
+          const isSelect = input.tagName.toLowerCase() === "select";
+          const options = isSelect
+            ? Array.from(input.options)
+                .map((o) => o.text.trim())
+                .filter((t) => t && !/^(select|choose|--|-)/i.test(t))
+            : [];
+          skippedFields.push({ fieldName, pageLabel, options });
+        }
+        continue;
+      }
 
       const didFill = fillInput(input, value);
       if (didFill) filled++;
@@ -334,7 +356,7 @@
     const unknownAlerts = filled === 0 ? [] : detectUnknownFields(filled);
     const jobInfo = extractJobInfo();
 
-    return { filled, skipped, alerts: [...blockerAlerts, ...unknownAlerts], no_fields: inputs.length === 0, jobInfo };
+    return { filled, skipped, skippedFields, alerts: [...blockerAlerts, ...unknownAlerts], no_fields: inputs.length === 0, jobInfo };
   }
 
   // ── Message listener ───────────────────────────────────────────────────────

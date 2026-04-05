@@ -20,6 +20,9 @@ const profileName    = document.getElementById("profile-name");
 const resumeStatus   = document.getElementById("resume-status");
 const avatarInitials = document.getElementById("avatar-initials");
 const openDashboard  = document.getElementById("open-dashboard");
+const missingSection = document.getElementById("missing-section");
+const missingFields  = document.getElementById("missing-fields");
+const btnSaveFill    = document.getElementById("btn-save-fill");
 const alertsList    = document.getElementById("alerts-list");
 const alertCount    = document.getElementById("alert-count");
 
@@ -174,6 +177,63 @@ async function updatePageInfo() {
   }
 }
 
+// ── Missing supplemental info ─────────────────────────────────────────────────
+
+let _saveFillHandler = null;
+
+function showMissingInfo(skippedFields, token) {
+  if (!skippedFields?.length) { missingSection.style.display = "none"; return; }
+
+  missingSection.style.display = "block";
+  missingFields.innerHTML = skippedFields.map((f) => {
+    if (f.options?.length > 0) {
+      const opts = f.options.map((o) => `<option value="${o}">${o}</option>`).join("");
+      return `<div class="missing-field-row">
+        <label class="missing-field-label" for="miss-${f.fieldName}">${f.pageLabel}</label>
+        <select class="missing-field-input" id="miss-${f.fieldName}">
+          <option value="">Select…</option>${opts}
+        </select></div>`;
+    }
+    return `<div class="missing-field-row">
+      <label class="missing-field-label" for="miss-${f.fieldName}">${f.pageLabel}</label>
+      <input type="text" class="missing-field-input" id="miss-${f.fieldName}" placeholder="Your answer…" /></div>`;
+  }).join("");
+
+  if (_saveFillHandler) btnSaveFill.removeEventListener("click", _saveFillHandler);
+  _saveFillHandler = async () => {
+    btnSaveFill.disabled = true;
+    btnSaveFill.textContent = "Saving…";
+    try {
+      for (const f of skippedFields) {
+        const el = document.getElementById(`miss-${f.fieldName}`);
+        const val = el?.value?.trim();
+        if (!val) continue;
+        await fetch(`${BASE_URL}/api/extension/supplemental`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+          body: JSON.stringify({ question_key: f.fieldName, question_label: f.pageLabel, answer: val }),
+        });
+      }
+      // Re-fetch profile and re-fill the page
+      const updated = await fetchProfile(token);
+      const tab = await getCurrentTab();
+      await chrome.tabs.sendMessage(tab.id, {
+        type: "CL_AUTOFILL",
+        profile: updated.profile,
+        supplemental: updated.supplemental,
+      });
+      missingSection.style.display = "none";
+      showFillResult("success", "Answers saved and fields filled!");
+    } catch (err) {
+      showFillResult("error", "Failed to save: " + (err.message || "Unknown error"));
+    } finally {
+      btnSaveFill.disabled = false;
+      btnSaveFill.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Save & Fill`;
+    }
+  };
+  btnSaveFill.addEventListener("click", _saveFillHandler);
+}
+
 // ── Autofill ──────────────────────────────────────────────────────────────────
 
 async function runAutofill() {
@@ -184,6 +244,7 @@ async function runAutofill() {
   autofillBadge.textContent = "Filling…";
   autofillBadge.className = "badge badge-warn";
   fillResult.style.display = "none";
+  missingSection.style.display = "none";
 
   try {
     const profileData = await fetchProfile(access_token);
@@ -230,6 +291,9 @@ async function runAutofill() {
       autofillBadge.className = "badge badge-idle";
       showFillResult("warn", "No fields were filled. This page may require manual input.");
     }
+
+    // Show missing supplemental fields so user can answer from the popup
+    showMissingInfo(response?.skippedFields ?? [], access_token);
 
     if (response?.alerts?.length > 0) {
       for (const alert of response.alerts) {
