@@ -15,6 +15,7 @@
     full_name:   [/full.?name/i, /your.?name/i, /applicant.?name/i, /^name$/i],
     email:       [/e.?mail/i, /email.?address/i],
     phone:       [/phone/i, /mobile/i, /cell/i, /telephone/i, /contact.?number/i],
+    street_address: [/street.?address/i, /address.?line.?1/i, /address.?1/i, /^address$/i, /mailing.?address/i],
     location:    [/\bcity\b/i, /^location$/i, /current.?location/i, /where.?do.?you.?live/i],
     zip_code:    [/zip/i, /postal.?code/i, /zip.?code/i, /post.?code/i],
     linkedin:    [/linkedin/i, /linked.?in/i, /linkedin.?url/i, /linkedin.?profile/i],
@@ -52,6 +53,7 @@
       full_name:           p.name ?? "",
       email:               p.email ?? "",
       phone:               p.phone ?? "",
+      street_address:      supp.street_address ?? "",
       location:            p.location ?? "",
       zip_code:            supp.zip_code ?? "",
       linkedin:            p.linkedin ?? "",
@@ -297,7 +299,9 @@
     "email":         "email",
     "tel":           "phone",
     "tel-national":  "phone",
-    "address-level2":"location",  // city only — street address intentionally omitted (no street data)
+    "street-address":"street_address",
+    "address-line1": "street_address",
+    "address-level2":"location",  // city
     "postal-code":   "zip_code",
     "url":           "website",
   };
@@ -306,7 +310,7 @@
 
   // Supplemental-sourced fields — these can be answered from the popup
   const SUPPLEMENTAL_KEYS = new Set([
-    "zip_code", "salary_expectation", "work_authorization", "sponsorship_needed",
+    "street_address", "zip_code", "salary_expectation", "work_authorization", "sponsorship_needed",
     "willing_to_relocate", "gender", "veteran_status", "disability_status", "ethnicity",
   ]);
 
