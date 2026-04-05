@@ -45,6 +45,9 @@ async function generateCodeChallenge(verifier) {
 // ── Google OAuth sign-in ──────────────────────────────────────────────────────
 
 async function signInWithGoogle() {
+  if (!chrome.identity) {
+    throw new Error("Extension needs to be reloaded. Go to chrome://extensions and click the reload button on CareerLaunch.");
+  }
   const codeVerifier = generateCodeVerifier();
   const codeChallenge = await generateCodeChallenge(codeVerifier);
   const redirectUrl = chrome.identity.getRedirectURL();
