@@ -398,6 +398,7 @@
       description = paragraphs.join("\n").slice(0, 3000);
     }
 
+    if (!title || !company) return null;
     return { title, company, location, description, url: jobUrl };
   }
 

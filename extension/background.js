@@ -67,14 +67,40 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   // ── Relay Logic for Injected Overlay ──
 
+  async function broadcastToTab(tabId, payload) {
+    try {
+      const frames = await chrome.scripting.getAllFrames({ tabId });
+      const framesWithResponse = await Promise.all(
+        frames.map((f) =>
+          chrome.tabs.sendMessage(tabId, payload, { frameId: f.frameId })
+            .then(res => ({ ...res, frameId: f.frameId }))
+            .catch(() => null)
+        )
+      );
+      // Return the first non-null, non-empty response
+      return framesWithResponse.find((r) => r && (r.title || r.ok)) || 
+             framesWithResponse.find((r) => r !== null) || 
+             null;
+    } catch (err) {
+      console.error("Broadcast failed:", err);
+      return null;
+    }
+  }
+
   if (message.type === "CL_RELAY_TO_CONTENT") {
     const tabId = sender.tab?.id;
     if (tabId) {
-      chrome.tabs.sendMessage(tabId, message.payload).then(sendResponse);
-      return true; // async response from content script
+      broadcastToTab(tabId, message.payload).then(sendResponse);
+    } else {
+      chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
+        if (tab?.id) {
+          broadcastToTab(tab.id, message.payload).then(sendResponse);
+        } else {
+          sendResponse({ error: "No active tab context" });
+        }
+      });
     }
-    sendResponse({ error: "No active tab context" });
-    return false;
+    return true;
   }
 
   if (message.type === "CL_GET_CURRENT_TAB_INFO") {
