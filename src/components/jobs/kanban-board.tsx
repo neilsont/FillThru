@@ -75,35 +75,42 @@ export function KanbanBoard() {
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      <div className="flex items-center gap-3 mb-4">
-        <JobSearchBar />
-        <div className="flex items-center border rounded-md bg-white">
-          <button
-            onClick={() => setViewMode("kanban")}
-            className={cn(
-              "flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-l-md transition-colors",
-              viewMode === "kanban"
-                ? "bg-primary text-white"
-                : "text-muted-foreground hover:text-foreground"
-            )}
-          >
-            <Columns3 className="h-3.5 w-3.5" /> Pipeline
-          </button>
-          <button
-            onClick={() => setViewMode("source")}
-            className={cn(
-              "flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-r-md transition-colors",
-              viewMode === "source"
-                ? "bg-primary text-white"
-                : "text-muted-foreground hover:text-foreground"
-            )}
-          >
-            <LayoutGrid className="h-3.5 w-3.5" /> By Source
-          </button>
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 mb-4">
+        <div className="flex-1 min-w-0">
+          <JobSearchBar />
         </div>
-        <Button onClick={() => setShowAddDialog(true)} size="sm">
-          <Plus className="h-4 w-4 mr-1" /> Add Job
-        </Button>
+        <div className="flex items-center gap-2 justify-between sm:justify-start">
+          <div className="flex items-center border rounded-md bg-white">
+            <button
+              onClick={() => setViewMode("kanban")}
+              className={cn(
+                "flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-l-md transition-colors",
+                viewMode === "kanban"
+                  ? "bg-primary text-white"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <Columns3 className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Pipeline</span>
+            </button>
+            <button
+              onClick={() => setViewMode("source")}
+              className={cn(
+                "flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-r-md transition-colors",
+                viewMode === "source"
+                  ? "bg-primary text-white"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <LayoutGrid className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">By Source</span>
+            </button>
+          </div>
+          <Button onClick={() => setShowAddDialog(true)} size="sm">
+            <Plus className="h-4 w-4 sm:mr-1" />
+            <span className="hidden sm:inline">Add Job</span>
+          </Button>
+        </div>
       </div>
 
       {viewMode === "kanban" ? (

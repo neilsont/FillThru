@@ -82,7 +82,7 @@ export function JobSearchBar() {
             onKeyDown={(e) => e.key === "Enter" && handleSearch()}
           />
         </div>
-        <div className="relative w-36">
+        <div className="relative w-36 hidden sm:block">
           <MapPin className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
           <Input
             placeholder="Location"

@@ -4,6 +4,8 @@ import { persist } from "zustand/middleware";
 interface UIState {
   sidebarCollapsed: boolean;
   toggleSidebar: () => void;
+  mobileMenuOpen: boolean;
+  setMobileMenuOpen: (open: boolean) => void;
 }
 
 export const useUIStore = create<UIState>()(
@@ -12,7 +14,9 @@ export const useUIStore = create<UIState>()(
       sidebarCollapsed: false,
       toggleSidebar: () =>
         set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
+      mobileMenuOpen: false,
+      setMobileMenuOpen: (open) => set({ mobileMenuOpen: open }),
     }),
-    { name: "careerlaunch-ui" }
+    { name: "careerlaunch-ui", partialize: (s) => ({ sidebarCollapsed: s.sidebarCollapsed }) }
   )
 );

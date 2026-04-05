@@ -105,11 +105,11 @@ export function ApplicationTable({ applications }: { applications: ApplicationWi
           <TableHeader>
             <TableRow className="hover:bg-transparent">
               <TableHead><SortHeader label="Job Title" field="title" /></TableHead>
-              <TableHead><SortHeader label="Company" field="company" /></TableHead>
+              <TableHead className="hidden sm:table-cell"><SortHeader label="Company" field="company" /></TableHead>
               <TableHead><SortHeader label="Status" field="status" /></TableHead>
-              <TableHead><SortHeader label="Match" field="match_score" /></TableHead>
-              <TableHead>Cover Letter</TableHead>
-              <TableHead><SortHeader label="Updated" field="updated_at" /></TableHead>
+              <TableHead className="hidden md:table-cell"><SortHeader label="Match" field="match_score" /></TableHead>
+              <TableHead className="hidden md:table-cell">Cover Letter</TableHead>
+              <TableHead className="hidden md:table-cell"><SortHeader label="Updated" field="updated_at" /></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -123,23 +123,23 @@ export function ApplicationTable({ applications }: { applications: ApplicationWi
                     {app.job.title}
                   </Link>
                 </TableCell>
-                <TableCell className="text-sm">{app.job.company}</TableCell>
+                <TableCell className="hidden sm:table-cell text-sm">{app.job.company}</TableCell>
                 <TableCell>
                   <Badge variant={STATUS_VARIANT[app.status] || "secondary"} className="text-[11px]">
                     {app.status}
                   </Badge>
                 </TableCell>
-                <TableCell className="text-sm">
+                <TableCell className="hidden md:table-cell text-sm">
                   {app.job.match_score !== null ? `${app.job.match_score}%` : "-"}
                 </TableCell>
-                <TableCell>
+                <TableCell className="hidden md:table-cell">
                   {app.cover_letter ? (
                     <Badge variant="success" className="text-[11px]">Yes</Badge>
                   ) : (
                     <span className="text-xs text-muted-foreground">No</span>
                   )}
                 </TableCell>
-                <TableCell className="text-xs text-muted-foreground">
+                <TableCell className="hidden md:table-cell text-xs text-muted-foreground">
                   {new Date(app.updated_at).toLocaleDateString()}
                 </TableCell>
               </TableRow>
