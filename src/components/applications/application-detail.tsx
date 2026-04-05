@@ -12,10 +12,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CoverLetterPanel } from "./cover-letter-panel";
 import { FieldMappingForm } from "./field-mapping-form";
-import { ArrowLeft, ExternalLink, MapPin, Building2, Briefcase, Loader2, Sparkles, FileText } from "lucide-react";
+import { ArrowLeft, ExternalLink, MapPin, Building2, Briefcase, Loader2, Sparkles, FileText, Pencil } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import type { FieldMapping } from "@/types/application";
+import { EditJobDialog } from "@/components/jobs/edit-job-dialog";
 
 const STATUS_VARIANT: Record<string, "default" | "secondary" | "success" | "destructive" | "warning"> = {
   draft: "secondary",
@@ -33,6 +34,7 @@ export function ApplicationDetail({ jobId }: { jobId: string }) {
   const mapFields = useMapFields();
   const { toast } = useToast();
   const [notes, setNotes] = useState("");
+  const [editOpen, setEditOpen] = useState(false);
 
   const isLoading = jobLoading || appLoading;
 
@@ -143,13 +145,18 @@ export function ApplicationDetail({ jobId }: { jobId: string }) {
                   )}
                 </div>
               </div>
-              {job.url && (
-                <a href={job.url} target="_blank" rel="noopener noreferrer">
-                  <Button variant="outline" size="sm">
-                    <ExternalLink className="h-3.5 w-3.5 mr-1" /> View
-                  </Button>
-                </a>
-              )}
+              <div className="flex items-center gap-2 shrink-0">
+                <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
+                  <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
+                </Button>
+                {job.url && (
+                  <a href={job.url} target="_blank" rel="noopener noreferrer">
+                    <Button variant="outline" size="sm">
+                      <ExternalLink className="h-3.5 w-3.5 mr-1" /> View
+                    </Button>
+                  </a>
+                )}
+              </div>
             </div>
           </CardHeader>
           <CardContent>
@@ -256,23 +263,34 @@ export function ApplicationDetail({ jobId }: { jobId: string }) {
                 </TabsContent>
               </Tabs>
 
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 {application.status === "draft" && (
                   <Button size="sm" onClick={() => handleStatusChange("ready")}>
                     Mark as Ready
                   </Button>
                 )}
                 {application.status === "ready" && (
-                  <Button size="sm" onClick={() => handleStatusChange("submitted")} variant="accent">
-                    Mark as Submitted
+                  <>
+                    <Button size="sm" variant="outline" onClick={() => handleStatusChange("draft")}>
+                      Back to Draft
+                    </Button>
+                    <Button size="sm" onClick={() => handleStatusChange("submitted")}>
+                      Mark as Submitted
+                    </Button>
+                  </>
+                )}
+                {application.status === "submitted" && (
+                  <Button size="sm" variant="outline" onClick={() => handleStatusChange("ready")}>
+                    Reopen
                   </Button>
                 )}
-                {(application.status === "draft" || application.status === "ready") && (
-                  <Button
-                    size="sm"
-                    onClick={() => handleStatusChange("withdrawn")}
-                    variant="outline"
-                  >
+                {application.status === "withdrawn" && (
+                  <Button size="sm" variant="outline" onClick={() => handleStatusChange("draft")}>
+                    Reopen Application
+                  </Button>
+                )}
+                {(application.status === "draft" || application.status === "ready" || application.status === "submitted") && (
+                  <Button size="sm" onClick={() => handleStatusChange("withdrawn")} variant="outline">
                     Withdraw
                   </Button>
                 )}
@@ -281,6 +299,8 @@ export function ApplicationDetail({ jobId }: { jobId: string }) {
           )}
         </div>
       </div>
+
+      <EditJobDialog job={job} open={editOpen} onOpenChange={setEditOpen} />
     </div>
   );
 }

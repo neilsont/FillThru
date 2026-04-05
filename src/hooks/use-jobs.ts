@@ -64,8 +64,9 @@ export function useUpdateJob() {
       if (!res.ok) throw new Error("Failed to update job");
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      queryClient.invalidateQueries({ queryKey: ["job", data.id] });
     },
   });
 }

@@ -25,21 +25,17 @@ For each field provide: field_key (machine-readable), field_label (human-readabl
 Common fields: full name, email, phone, location, linkedin, website, years of experience, current title, desired salary, work authorization, willing to relocate, education level, skills summary.
 Return ONLY a JSON object with a "mappings" array. No markdown.`;
 
-// ─── Gemini helpers ────────────────────────────────────────────────────────────
+// ─── Provider helpers ──────────────────────────────────────────────────────────
 
-async function geminiChat(systemPrompt: string, userPrompt: string): Promise<string> {
-  const { getGeminiClient, GEMINI_MODEL } = await import("@/lib/google/client");
-  const genAI = getGeminiClient();
-  const model = genAI.getGenerativeModel({ model: GEMINI_MODEL, systemInstruction: systemPrompt });
-  const result = await model.generateContent(userPrompt);
-  return result.response.text().trim();
-}
-
-// ─── OpenAI helpers ────────────────────────────────────────────────────────────
-
-async function openaiChat(model: "gpt-4o-mini", systemPrompt: string, userPrompt: string): Promise<string> {
-  const { getOpenAIClient } = await import("@/lib/openai/client");
-  const client = getOpenAIClient();
+async function openaiCompatChat(
+  apiKey: string,
+  baseURL: string,
+  model: string,
+  systemPrompt: string,
+  userPrompt: string
+): Promise<string> {
+  const OpenAI = (await import("openai")).default;
+  const client = new OpenAI({ apiKey, baseURL });
   const res = await client.chat.completions.create({
     model,
     max_tokens: 4096,
@@ -51,13 +47,53 @@ async function openaiChat(model: "gpt-4o-mini", systemPrompt: string, userPrompt
   return res.choices[0]?.message?.content?.trim() ?? "";
 }
 
-// ─── Dispatcher ────────────────────────────────────────────────────────────────
+async function anthropicChat(systemPrompt: string, userPrompt: string): Promise<string> {
+  const Anthropic = (await import("@anthropic-ai/sdk")).default;
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) throw new Error("ANTHROPIC_API_KEY is not set");
+  const client = new Anthropic({ apiKey });
+  const res = await client.messages.create({
+    model: "claude-haiku-4-5-20251001",
+    max_tokens: 4096,
+    system: systemPrompt,
+    messages: [{ role: "user", content: userPrompt }],
+  });
+  const block = res.content.find((b) => b.type === "text");
+  if (!block || block.type !== "text") throw new Error("No text response from Anthropic");
+  return block.text.trim();
+}
 
 async function chat(model: AIModel, systemPrompt: string, userPrompt: string): Promise<string> {
-  if (model === "gemini-2.0-flash") {
-    return geminiChat(systemPrompt, userPrompt);
+  switch (model) {
+    case "groq/llama-3.3-70b-versatile": {
+      const key = process.env.GROQ_AI_API_KEY;
+      if (!key) throw new Error("GROQ_AI_API_KEY is not set");
+      return openaiCompatChat(key, "https://api.groq.com/openai/v1", "llama-3.3-70b-versatile", systemPrompt, userPrompt);
+    }
+    case "openrouter/qwen3.6-plus": {
+      const key = process.env.OPEN_ROUTER_API_KEY;
+      if (!key) throw new Error("OPEN_ROUTER_API_KEY is not set");
+      return openaiCompatChat(key, "https://openrouter.ai/api/v1", "qwen/qwen3.6-plus:free", systemPrompt, userPrompt);
+    }
+    case "gemini-2.0-flash": {
+      const { GoogleGenerativeAI } = await import("@google/generative-ai");
+      const key = process.env.GOOGLE_AI_STUDIO_API_KEY;
+      if (!key) throw new Error("GOOGLE_AI_STUDIO_API_KEY is not set");
+      const genAI = new GoogleGenerativeAI(key);
+      const m = genAI.getGenerativeModel({ model: "gemini-2.0-flash", systemInstruction: systemPrompt });
+      const result = await m.generateContent(userPrompt);
+      return result.response.text().trim();
+    }
+    case "gpt-4o-mini": {
+      const key = process.env.OPENAI_API_KEY;
+      if (!key) throw new Error("OPENAI_API_KEY is not set");
+      return openaiCompatChat(key, "https://api.openai.com/v1", "gpt-4o-mini", systemPrompt, userPrompt);
+    }
+    case "claude-haiku-4-5-20251001":
+      return anthropicChat(systemPrompt, userPrompt);
+    default:
+      throw new Error(`Unknown model: ${model}`);
   }
-  return openaiChat(model, systemPrompt, userPrompt);
 }
 
 function stripCodeFences(text: string): string {
@@ -67,11 +103,7 @@ function stripCodeFences(text: string): string {
 // ─── Public API ────────────────────────────────────────────────────────────────
 
 export async function parseResumeText(rawText: string, model: AIModel = DEFAULT_MODEL): Promise<ParsedResume> {
-  const text = await chat(
-    model,
-    RESUME_SYSTEM,
-    `Parse the following resume text into the required JSON structure:\n\n${rawText}`
-  );
+  const text = await chat(model, RESUME_SYSTEM, `Parse the following resume text into the required JSON structure:\n\n${rawText}`);
   return JSON.parse(stripCodeFences(text)) as ParsedResume;
 }
 
@@ -102,6 +134,6 @@ export async function mapApplicationFields(
     `JOB DESCRIPTION:\n${jobDescription}\n\nCANDIDATE RESUME:\n${JSON.stringify(resume, null, 2)}\n\nSUPPLEMENTAL ANSWERS:\n${JSON.stringify(supplemental, null, 2)}`
   );
   const jsonStr = text.match(/```(?:json)?\s*([\s\S]*?)```/)?.[1] ?? text;
-  const parsed = JSON.parse(jsonStr.trim());
+  const parsed = JSON.parse(stripCodeFences(jsonStr));
   return parsed.mappings as FieldMapping[];
 }
