@@ -8,8 +8,6 @@ const SUPABASE_ANON_KEY = "sb_publishable_iyRuOLc1Nwwk_fb0frFVIQ_gDSBadVw";
 // ── DOM refs ────────────────────────────────────────────────────────────────
 const viewLogin = document.getElementById("view-login");
 const viewMain  = document.getElementById("view-main");
-const loginEmail    = document.getElementById("login-email");
-const loginPassword = document.getElementById("login-password");
 const loginError    = document.getElementById("login-error");
 const btnLogin      = document.getElementById("btn-login");
 const btnLogout     = document.getElementById("btn-logout");
@@ -28,23 +26,74 @@ const alertCount    = document.getElementById("alert-count");
 
 openDashboard.href = BASE_URL + "/dashboard";
 
-// ── Auth helpers ─────────────────────────────────────────────────────────────
+// ── PKCE helpers ──────────────────────────────────────────────────────────────
 
-async function supabaseSignIn(email, password) {
-  const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+function generateCodeVerifier() {
+  const array = new Uint8Array(32);
+  crypto.getRandomValues(array);
+  return btoa(String.fromCharCode(...array))
+    .replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
+}
+
+async function generateCodeChallenge(verifier) {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(verifier);
+  const digest = await crypto.subtle.digest("SHA-256", data);
+  return btoa(String.fromCharCode(...new Uint8Array(digest)))
+    .replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
+}
+
+// ── Google OAuth sign-in ──────────────────────────────────────────────────────
+
+async function signInWithGoogle() {
+  const codeVerifier = generateCodeVerifier();
+  const codeChallenge = await generateCodeChallenge(codeVerifier);
+  const redirectUrl = chrome.identity.getRedirectURL();
+
+  const authUrl = new URL(`${SUPABASE_URL}/auth/v1/authorize`);
+  authUrl.searchParams.set("provider", "google");
+  authUrl.searchParams.set("redirect_to", redirectUrl);
+  authUrl.searchParams.set("code_challenge", codeChallenge);
+  authUrl.searchParams.set("code_challenge_method", "s256");
+
+  // Open Google OAuth popup
+  const responseUrl = await new Promise((resolve, reject) => {
+    chrome.identity.launchWebAuthFlow(
+      { url: authUrl.toString(), interactive: true },
+      (url) => {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+        } else {
+          resolve(url);
+        }
+      }
+    );
+  });
+
+  // Extract the authorization code from the redirect URL
+  const parsedUrl = new URL(responseUrl);
+  const code = parsedUrl.searchParams.get("code");
+  if (!code) throw new Error("No authorization code received from Google");
+
+  // Exchange code + verifier for tokens
+  const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=pkce`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       "apikey": SUPABASE_ANON_KEY,
     },
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ auth_code: code, code_verifier: codeVerifier }),
   });
+
   if (!res.ok) {
     const err = await res.json();
     throw new Error(err.error_description || err.msg || "Sign in failed");
   }
+
   return res.json(); // { access_token, refresh_token, user, ... }
 }
+
+// ── Auth storage ──────────────────────────────────────────────────────────────
 
 async function getStoredAuth() {
   return new Promise((resolve) => {
@@ -68,8 +117,7 @@ async function clearAuth() {
 
 async function fetchProfile(token) {
   const res = await fetch(`${BASE_URL}/api/extension/profile`, {
-    headers: { "Cookie": `sb-access-token=${token}` },
-    credentials: "include",
+    headers: { "Authorization": `Bearer ${token}` },
   });
   if (!res.ok) throw new Error("Could not fetch profile");
   return res.json();
@@ -145,10 +193,7 @@ async function runAutofill() {
   fillResult.style.display = "none";
 
   try {
-    // Fetch latest profile
     const profileData = await fetchProfile(access_token);
-
-    // Send to content script
     const tab = await getCurrentTab();
     const response = await chrome.tabs.sendMessage(tab.id, {
       type: "CL_AUTOFILL",
@@ -170,7 +215,6 @@ async function runAutofill() {
       showFillResult("warn", "No fields were filled. This page may require manual input.");
     }
 
-    // Handle any blockers the content script flagged
     if (response?.alerts?.length > 0) {
       for (const alert of response.alerts) {
         await sendAlert(access_token, alert);
@@ -192,9 +236,8 @@ async function sendAlert(token, alert) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Cookie": `sb-access-token=${token}`,
+        "Authorization": `Bearer ${token}`,
       },
-      credentials: "include",
       body: JSON.stringify(alert),
     });
   } catch {
@@ -202,7 +245,7 @@ async function sendAlert(token, alert) {
   }
 }
 
-// ── Load alerts from storage ──────────────────────────────────────────────────
+// ── Load alerts ───────────────────────────────────────────────────────────────
 
 async function loadAlerts() {
   const { alerts = [] } = await new Promise((r) => chrome.storage.local.get("alerts", r));
@@ -227,13 +270,11 @@ async function init() {
   const { access_token, user_email } = await getStoredAuth();
 
   if (access_token && user_email) {
-    // Check if still valid by fetching profile
     try {
       const data = await fetchProfile(access_token);
       showMainView(data, user_email);
       setStatus(true);
     } catch {
-      // Token expired
       await clearAuth();
       showLoginView();
     }
@@ -259,21 +300,13 @@ function showMainView(profileData, email) {
 // ── Event listeners ────────────────────────────────────────────────────────────
 
 btnLogin.addEventListener("click", async () => {
-  const email = loginEmail.value.trim();
-  const password = loginPassword.value;
   loginError.style.display = "none";
-
-  if (!email || !password) {
-    loginError.textContent = "Please enter your email and password.";
-    loginError.style.display = "block";
-    return;
-  }
-
   btnLogin.disabled = true;
-  btnLogin.textContent = "Signing in…";
+  btnLogin.textContent = "Opening Google…";
 
   try {
-    const auth = await supabaseSignIn(email, password);
+    const auth = await signInWithGoogle();
+    const email = auth.user?.email ?? "";
     await storeAuth(auth.access_token, email, auth.user?.id);
     const profileData = await fetchProfile(auth.access_token);
     showMainView(profileData, email);
@@ -283,12 +316,15 @@ btnLogin.addEventListener("click", async () => {
     loginError.style.display = "block";
   } finally {
     btnLogin.disabled = false;
-    btnLogin.textContent = "Sign in";
+    btnLogin.innerHTML = `
+      <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" style="flex-shrink:0">
+        <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+        <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+        <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+        <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+      </svg>
+      Sign in with Google`;
   }
-});
-
-loginPassword.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") btnLogin.click();
 });
 
 btnLogout.addEventListener("click", async () => {

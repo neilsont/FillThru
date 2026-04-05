@@ -1,5 +1,5 @@
-import { createClient } from "@/lib/supabase/server";
-import { NextResponse } from "next/server";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
+import { NextRequest, NextResponse } from "next/server";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -11,14 +11,23 @@ export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const authHeader = request.headers.get("Authorization");
+    const token = authHeader?.replace("Bearer ", "").trim();
 
-    if (!user) {
+    if (!token) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: CORS_HEADERS });
+    }
+
+    const supabase = createSupabaseClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+
+    const { data: { user }, error } = await supabase.auth.getUser(token);
+
+    if (error || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: CORS_HEADERS });
     }
 

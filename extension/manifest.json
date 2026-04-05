@@ -32,7 +32,8 @@
     "storage",
     "activeTab",
     "scripting",
-    "notifications"
+    "notifications",
+    "identity"
   ],
   "host_permissions": [
     "<all_urls>"
