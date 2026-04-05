@@ -80,12 +80,12 @@ export async function PUT(request: Request) {
 
     const { id, answer, saveToSupplemental } = await request.json();
 
-    // Resolve the question
+    // Resolve the question (answer is optional — user may just dismiss)
     const { data: question, error } = await supabase
       .from("flagged_questions")
       .update({
         resolved: true,
-        answer,
+        ...(answer ? { answer } : {}),
         updated_at: new Date().toISOString(),
       })
       .eq("id", id)

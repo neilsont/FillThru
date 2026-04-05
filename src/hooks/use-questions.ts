@@ -20,7 +20,7 @@ export function useResolveQuestion() {
   return useMutation({
     mutationFn: async (data: {
       id: string;
-      answer: string;
+      answer?: string;
       saveToSupplemental?: boolean;
     }) => {
       const res = await fetch("/api/questions", {

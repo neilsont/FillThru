@@ -9,9 +9,13 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { CheckCircle2, MessageCircleQuestion, Loader2 } from "lucide-react";
+import { CheckCircle2, MessageCircleQuestion, Loader2, X } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
+
+function isBlockerOnly(text: string) {
+  return /captcha|identity.?verif|file.?upload|resume.*upload/i.test(text);
+}
 
 export default function QuestionsPage() {
   const { data: questions, isLoading } = useQuestions(false);
@@ -21,18 +25,29 @@ export default function QuestionsPage() {
   const [saving, setSaving] = useState<Record<string, boolean>>({});
 
   const handleResolve = async (id: string, saveToSupplemental: boolean) => {
-    const answer = answers[id];
-    if (!answer?.trim()) {
-      toast({ title: "Please enter an answer", variant: "destructive" });
+    const answer = answers[id]?.trim();
+    if (!answer) {
+      toast({ title: "Please enter an answer first", variant: "destructive" });
       return;
     }
-
     setSaving((s) => ({ ...s, [id]: true }));
     try {
       await resolveMutation.mutateAsync({ id, answer, saveToSupplemental });
-      toast({ title: "Question resolved!" });
+      toast({ title: "Resolved!" });
     } catch {
       toast({ title: "Failed to resolve", variant: "destructive" });
+    } finally {
+      setSaving((s) => ({ ...s, [id]: false }));
+    }
+  };
+
+  const handleDismiss = async (id: string) => {
+    setSaving((s) => ({ ...s, [id]: true }));
+    try {
+      await resolveMutation.mutateAsync({ id });
+      toast({ title: "Dismissed" });
+    } catch {
+      toast({ title: "Failed to dismiss", variant: "destructive" });
     } finally {
       setSaving((s) => ({ ...s, [id]: false }));
     }
@@ -63,7 +78,7 @@ export default function QuestionsPage() {
         <EmptyState
           icon={CheckCircle2}
           title="All caught up!"
-          description="No pending questions. Questions appear here when AI needs more info to fill application fields."
+          description="No pending questions. Questions appear here when the extension encounters fields it can't fill automatically."
         />
       ) : (
         <div className="space-y-4">
@@ -94,45 +109,79 @@ export default function QuestionsPage() {
                 )}
               </div>
               <div className="space-y-2">
-                {qs.map((q) => (
-                  <Card key={q.id} className="border-border/60">
-                    <CardContent className="p-4">
-                      <p className="font-medium text-sm mb-3">{q.question_text}</p>
-                      <div className="flex gap-2">
-                        <Input
-                          placeholder="Your answer..."
-                          value={answers[q.id] || ""}
-                          onChange={(e) =>
-                            setAnswers((a) => ({ ...a, [q.id]: e.target.value }))
-                          }
-                          className="flex-1"
-                        />
-                        <Button
-                          size="sm"
-                          onClick={() => handleResolve(q.id, true)}
-                          disabled={saving[q.id]}
-                        >
-                          {saving[q.id] ? (
-                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          ) : (
-                            "Save & Resolve"
+                {qs.map((q) => {
+                  const blockerOnly = isBlockerOnly(q.question_text);
+                  return (
+                    <Card key={q.id} className="border-border/60">
+                      <CardContent className="p-4">
+                        <div className="flex items-start justify-between gap-2 mb-3">
+                          <p className="font-medium text-sm">{q.question_text}</p>
+                          {blockerOnly && (
+                            <Badge variant="secondary" className="text-[10px] shrink-0">Manual only</Badge>
                           )}
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleResolve(q.id, false)}
-                          disabled={saving[q.id]}
-                        >
-                          Resolve only
-                        </Button>
-                      </div>
-                      <p className="text-[11px] text-muted-foreground mt-2">
-                        &ldquo;Save & Resolve&rdquo; also saves this answer for future applications.
-                      </p>
-                    </CardContent>
-                  </Card>
-                ))}
+                        </div>
+
+                        {blockerOnly ? (
+                          <div className="flex items-center gap-3">
+                            <p className="text-xs text-muted-foreground flex-1">
+                              Complete this manually on the job site, then dismiss.
+                            </p>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleDismiss(q.id)}
+                              disabled={saving[q.id]}
+                            >
+                              {saving[q.id] ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <><X className="h-3.5 w-3.5 mr-1.5" />Dismiss</>
+                              )}
+                            </Button>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="flex gap-2 flex-wrap sm:flex-nowrap">
+                              <Input
+                                placeholder="Your answer..."
+                                value={answers[q.id] || ""}
+                                onChange={(e) => setAnswers((a) => ({ ...a, [q.id]: e.target.value }))}
+                                className="flex-1 min-w-0"
+                              />
+                              <Button
+                                size="sm"
+                                onClick={() => handleResolve(q.id, true)}
+                                disabled={saving[q.id]}
+                              >
+                                {saving[q.id] ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Save & Resolve"}
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleResolve(q.id, false)}
+                                disabled={saving[q.id]}
+                              >
+                                Resolve only
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => handleDismiss(q.id)}
+                                disabled={saving[q.id]}
+                                title="Dismiss without answering"
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                            <p className="text-[11px] text-muted-foreground mt-2">
+                              &ldquo;Save & Resolve&rdquo; saves the answer for future applications.
+                            </p>
+                          </>
+                        )}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
               </div>
             </div>
           ))}

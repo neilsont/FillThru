@@ -114,7 +114,7 @@ export function KanbanBoard() {
       </div>
 
       {viewMode === "kanban" ? (
-        <div className="flex gap-3 overflow-x-auto flex-1 pb-4">
+        <div className="flex flex-col md:flex-row gap-3 md:overflow-x-auto pb-4">
           {jobsByStatus.map((col) => (
             <KanbanColumn
               key={col.id}

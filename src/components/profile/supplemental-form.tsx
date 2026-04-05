@@ -1,28 +1,29 @@
 "use client";
 
-import { useSupplemental, useSaveSupplemental } from "@/hooks/use-supplemental";
+import { useSupplemental, useSaveSupplemental, useDeleteSupplemental } from "@/hooks/use-supplemental";
 import { useToast } from "@/components/ui/toast";
 import { SUPPLEMENTAL_QUESTIONS } from "@/lib/constants";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { X } from "lucide-react";
 import { useState, useEffect } from "react";
 
 export function SupplementalForm() {
   const { data: answers, isLoading } = useSupplemental();
   const saveMutation = useSaveSupplemental();
+  const deleteMutation = useDeleteSupplemental();
   const { toast } = useToast();
   const [values, setValues] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (answers) {
       const map: Record<string, string> = {};
-      answers.forEach((a) => {
-        map[a.question_key] = a.answer;
-      });
+      answers.forEach((a) => { map[a.question_key] = a.answer; });
       setValues(map);
     }
   }, [answers]);
@@ -51,6 +52,14 @@ export function SupplementalForm() {
     );
   };
 
+  const handleDelete = (key: string) => {
+    setValues((prev) => { const next = { ...prev }; delete next[key]; return next; });
+    deleteMutation.mutate(key, {
+      onSuccess: () => toast({ title: "Cleared" }),
+      onError: () => toast({ title: "Failed to clear", variant: "destructive" }),
+    });
+  };
+
   return (
     <Card className="mt-4 border-border/60">
       <CardHeader className="pb-3">
@@ -69,10 +78,23 @@ export function SupplementalForm() {
 
             return (
               <div key={q.key} className="space-y-1.5">
-                <div className="flex items-center gap-2">
-                  <Label htmlFor={q.key} className="text-[13px]">{q.label}</Label>
-                  {isFlagged && !hasAnswer && (
-                    <Badge variant="warning" className="text-[10px] px-1.5 py-0">Needs answer</Badge>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Label htmlFor={q.key} className="text-[13px]">{q.label}</Label>
+                    {isFlagged && !hasAnswer && (
+                      <Badge variant="warning" className="text-[10px] px-1.5 py-0 shrink-0">Needs answer</Badge>
+                    )}
+                  </div>
+                  {hasAnswer && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive shrink-0"
+                      onClick={() => handleDelete(q.key)}
+                      title="Clear answer"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </Button>
                   )}
                 </div>
                 {q.type === "select" && "options" in q ? (
@@ -85,9 +107,7 @@ export function SupplementalForm() {
                     </SelectTrigger>
                     <SelectContent>
                       {q.options!.map((opt) => (
-                        <SelectItem key={opt} value={opt}>
-                          {opt}
-                        </SelectItem>
+                        <SelectItem key={opt} value={opt}>{opt}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>

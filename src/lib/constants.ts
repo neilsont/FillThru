@@ -17,6 +17,7 @@ export const STATUS_COLORS: Record<string, string> = {
 };
 
 export const SUPPLEMENTAL_QUESTIONS = [
+  { key: "zip_code", label: "ZIP / Postal Code", type: "text" as const },
   { key: "ethnicity", label: "Ethnicity", type: "text" as const },
   { key: "disability_status", label: "Disability status", type: "select" as const, options: ["Yes", "No", "Prefer not to say"] },
   { key: "veteran_status", label: "Veteran status", type: "select" as const, options: ["Yes", "No", "Prefer not to say"] },

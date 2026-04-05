@@ -21,7 +21,7 @@ export function KanbanColumn({ id, label, color, jobs, isDragTarget, onDrop }: K
   return (
     <div
       className={cn(
-        "w-[272px] shrink-0 flex flex-col rounded-lg transition-all duration-150",
+        "w-full md:w-[272px] md:shrink-0 flex flex-col rounded-lg transition-all duration-150",
         color,
         dragOver && isDragTarget && "ring-2 ring-primary/60 ring-offset-1"
       )}
@@ -42,7 +42,7 @@ export function KanbanColumn({ id, label, color, jobs, isDragTarget, onDrop }: K
           {jobs.length}
         </Badge>
       </div>
-      <div className="flex-1 overflow-y-auto space-y-2 px-2 pb-2 min-h-[120px]">
+      <div className="space-y-2 px-2 pb-2 min-h-[60px] md:flex-1 md:overflow-y-auto">
         {jobs.map((job) => (
           <JobCard key={job.id} job={job} />
         ))}

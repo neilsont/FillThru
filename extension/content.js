@@ -16,6 +16,7 @@
     email:       [/e.?mail/i, /email.?address/i],
     phone:       [/phone/i, /mobile/i, /cell/i, /telephone/i, /contact.?number/i],
     location:    [/city/i, /location/i, /address/i, /current.?location/i, /where.?do.?you.?live/i],
+    zip_code:    [/zip/i, /postal.?code/i, /zip.?code/i, /post.?code/i],
     linkedin:    [/linkedin/i, /linked.?in/i, /linkedin.?url/i, /linkedin.?profile/i],
     website:     [/website/i, /portfolio/i, /personal.?site/i, /web.?url/i, /github/i],
 
@@ -52,6 +53,7 @@
       email:               p.email ?? "",
       phone:               p.phone ?? "",
       location:            p.location ?? "",
+      zip_code:            supp.zip_code ?? "",
       linkedin:            p.linkedin ?? "",
       website:             p.website ?? "",
       current_title:       exp.title ?? "",
@@ -236,23 +238,51 @@
   function detectUnknownFields(filledCount) {
     const alerts = [];
     const allInputs = document.querySelectorAll("input:not([type=hidden]):not([type=submit]):not([type=button]):not([type=file]), textarea, select");
-    let unfilled = 0;
+    const unknownLabels = [];
     for (const input of allInputs) {
       if (!isVisible(input)) continue;
       if (input.value?.trim()) continue; // already has value
-      const label = getFieldLabel(input);
-      if (!label.trim()) continue;
-      if (!matchField(label)) unfilled++;
+      const label = getFieldLabel(input).trim();
+      if (!label) continue;
+      if (!matchField(label)) {
+        // Deduplicate and keep short label
+        const shortLabel = label.split(/[\n\r]/)[0].trim().slice(0, 60);
+        if (shortLabel && !unknownLabels.includes(shortLabel)) {
+          unknownLabels.push(shortLabel);
+        }
+      }
     }
-    if (unfilled > 2) {
+    if (unknownLabels.length > 2) {
       alerts.push({
         blocker_type: "unknown_fields",
-        blocker_detail: `${unfilled} unrecognized field${unfilled !== 1 ? "s" : ""} on this page need manual review`,
+        blocker_detail: `Fields needing manual input: ${unknownLabels.slice(0, 5).join(" · ")}`,
         job_url: window.location.href,
         company: document.title,
       });
     }
     return alerts;
+  }
+
+  // ── Extract job info from the current page ────────────────────────────────
+
+  function extractJobInfo() {
+    const titleEl =
+      document.querySelector('[data-testid="job-title"], [class*="jobTitle"], [class*="job-title"], [class*="job_title"], .jobsearch-JobInfoHeader-title') ||
+      document.querySelector('h1');
+    const companyEl =
+      document.querySelector('[data-testid="company-name"], [class*="companyName"], [class*="company-name"], [class*="company_name"], .jobsearch-CompanyInfoWithoutHeaderImage') ||
+      document.querySelector('[class*="employer"], [class*="Employer"]');
+    const locationEl =
+      document.querySelector('[data-testid="job-location"], [class*="location"], [class*="Location"]');
+
+    const rawTitle = titleEl?.textContent?.trim() || document.title.replace(/\s*[-|–]\s*.*$/, "").trim();
+    const company = companyEl?.textContent?.trim() || "";
+    const location = locationEl?.textContent?.trim() || "";
+
+    // Strip noise from page title fallbacks
+    const title = rawTitle.replace(/apply.?for\s*/i, "").replace(/\s*[-|–]\s*(indeed|linkedin|glassdoor|google)$/i, "").trim();
+
+    return { title, company, location, url: window.location.href };
   }
 
   // ── Main fill routine ──────────────────────────────────────────────────────
@@ -281,8 +311,9 @@
 
     const blockerAlerts = detectBlockers();
     const unknownAlerts = filled === 0 ? [] : detectUnknownFields(filled);
+    const jobInfo = extractJobInfo();
 
-    return { filled, skipped, alerts: [...blockerAlerts, ...unknownAlerts], no_fields: inputs.length === 0 };
+    return { filled, skipped, alerts: [...blockerAlerts, ...unknownAlerts], no_fields: inputs.length === 0, jobInfo };
   }
 
   // ── Message listener ───────────────────────────────────────────────────────

@@ -201,6 +201,11 @@ async function runAutofill() {
       supplemental: profileData.supplemental,
     });
 
+    // Always save the job being applied to, regardless of fill success
+    if (response?.jobInfo) {
+      await saveJobToCareerLaunch(access_token, response.jobInfo);
+    }
+
     if (response?.filled > 0) {
       autofillBadge.textContent = `${response.filled} filled`;
       autofillBadge.className = "badge badge-ok";
@@ -227,6 +232,21 @@ async function runAutofill() {
     showFillResult("error", "Could not fill: " + (err.message ?? "Unknown error"));
   } finally {
     btnAutofill.disabled = false;
+  }
+}
+
+async function saveJobToCareerLaunch(token, jobInfo) {
+  try {
+    await fetch(`${BASE_URL}/api/extension/save-job`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`,
+      },
+      body: JSON.stringify(jobInfo),
+    });
+  } catch {
+    // best-effort — don't block the user if this fails
   }
 }
 

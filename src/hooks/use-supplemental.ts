@@ -35,3 +35,18 @@ export function useSaveSupplemental() {
     },
   });
 }
+
+export function useDeleteSupplemental() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (question_key: string) => {
+      const res = await fetch(`/api/supplemental?key=${encodeURIComponent(question_key)}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error("Failed to delete");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["supplemental"] });
+    },
+  });
+}
