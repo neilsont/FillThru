@@ -266,25 +266,83 @@
   }
 
   // ── Extract job info from the current page ────────────────────────────────
+  // Handles Indeed's split-panel layout, Indeed Apply modal, and generic pages
 
   function extractJobInfo() {
-    const titleEl =
-      document.querySelector('[data-testid="job-title"], [class*="jobTitle"], [class*="job-title"], [class*="job_title"], .jobsearch-JobInfoHeader-title') ||
-      document.querySelector('h1');
-    const companyEl =
-      document.querySelector('[data-testid="company-name"], [class*="companyName"], [class*="company-name"], [class*="company_name"], .jobsearch-CompanyInfoWithoutHeaderImage') ||
-      document.querySelector('[class*="employer"], [class*="Employer"]');
-    const locationEl =
-      document.querySelector('[data-testid="job-location"], [class*="location"], [class*="Location"]');
+    const host = window.location.hostname;
+    const isIndeed = host.includes("indeed.com");
 
-    const rawTitle = titleEl?.textContent?.trim() || document.title.replace(/\s*[-|–]\s*.*$/, "").trim();
-    const company = companyEl?.textContent?.trim() || "";
-    const location = locationEl?.textContent?.trim() || "";
+    let title = "", company = "", location = "", description = "", jobUrl = window.location.href;
 
-    // Strip noise from page title fallbacks
-    const title = rawTitle.replace(/apply.?for\s*/i, "").replace(/\s*[-|–]\s*(indeed|linkedin|glassdoor|google)$/i, "").trim();
+    if (isIndeed) {
+      // ── Indeed job search results (split panel) ────────────────────────────
+      // The selected job detail shows in the right panel
+      const panel =
+        document.querySelector('[data-testid="jobsearch-JobInfoHeader-title"]') ||
+        document.querySelector(".jobsearch-JobInfoHeader-title") ||
+        document.querySelector('[class*="jobTitle"] h1') ||
+        document.querySelector('[class*="JobInfoHeader"] h1') ||
+        document.querySelector("h1.icl-u-xs-mb--xs");
 
-    return { title, company, location, url: window.location.href };
+      title = panel?.textContent?.trim() || "";
+
+      // Company name
+      const companyEl =
+        document.querySelector('[data-testid="inlineHeader-companyName"] a') ||
+        document.querySelector('[data-testid="inlineHeader-companyName"]') ||
+        document.querySelector('[class*="companyName"]') ||
+        document.querySelector(".jobsearch-CompanyInfoWithoutHeaderImage");
+      company = companyEl?.textContent?.trim() || "";
+
+      // Location
+      const locationEl =
+        document.querySelector('[data-testid="job-location"]') ||
+        document.querySelector('[data-testid="inlineHeader-companyLocation"]') ||
+        document.querySelector(".jobsearch-JobInfoHeader-subtitle [class*='location']");
+      location = locationEl?.textContent?.trim() || "";
+
+      // Job description text (for context)
+      const descEl =
+        document.querySelector('[id="jobDescriptionText"]') ||
+        document.querySelector('[class*="jobsearch-jobDescriptionText"]') ||
+        document.querySelector('[data-testid="jobDescriptionText"]');
+      description = descEl?.innerText?.trim().slice(0, 2000) || "";
+
+      // Try to get the canonical job URL from the selected job card
+      const selectedCard = document.querySelector('[class*="job_seen_beacon"][class*="selected"] a[href*="clk"]') ||
+        document.querySelector('a[data-jk][href*="/viewjob"]');
+      if (selectedCard?.href) {
+        try {
+          const u = new URL(selectedCard.href, window.location.href);
+          jobUrl = u.origin + u.pathname + (u.searchParams.get("jk") ? `?jk=${u.searchParams.get("jk")}` : "");
+        } catch {}
+      } else if (window.location.search.includes("jk=")) {
+        const jk = new URLSearchParams(window.location.search).get("jk");
+        if (jk) jobUrl = `https://www.indeed.com/viewjob?jk=${jk}`;
+      }
+    }
+
+    // ── Generic fallback for any site ─────────────────────────────────────────
+    if (!title) {
+      const h1 = document.querySelector("h1");
+      title = h1?.textContent?.trim() || document.title.replace(/\s*[-|–]\s*.*$/, "").trim();
+    }
+    if (!company) {
+      const el = document.querySelector('[class*="company"], [class*="employer"], [class*="Employer"]');
+      company = el?.textContent?.trim() || "";
+    }
+    if (!location) {
+      const el = document.querySelector('[class*="location"], [class*="Location"]');
+      location = el?.textContent?.trim() || "";
+    }
+
+    // Clean up titles that say "Apply for X" or have site branding appended
+    title = title
+      .replace(/^apply\s+(for\s+)?/i, "")
+      .replace(/\s*[-|–]\s*(indeed|linkedin|glassdoor|google jobs?)$/i, "")
+      .trim();
+
+    return { title, company, location, description, url: jobUrl };
   }
 
   // ── Standard HTML autocomplete → field name map ───────────────────────────

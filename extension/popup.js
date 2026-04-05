@@ -273,15 +273,23 @@ async function runAutofill() {
       }
     }
 
-    // Always save the job being applied to, regardless of fill success
-    if (response?.jobInfo) {
-      await saveJobToCareerLaunch(access_token, response.jobInfo);
+    // Always save the job to CareerLaunch when Fill Application is clicked
+    let savedJob = null;
+    if (response?.jobInfo?.url) {
+      const saveResult = await saveJobToCareerLaunch(access_token, response.jobInfo);
+      savedJob = saveResult;
     }
+
+    const jobSavedMsg = savedJob?.created
+      ? ` Job "${response.jobInfo?.title || "this job"}" added to your dashboard.`
+      : savedJob
+        ? "" // already existed, no extra message
+        : "";
 
     if (response?.filled > 0) {
       autofillBadge.textContent = `${response.filled} filled`;
       autofillBadge.className = "badge badge-ok";
-      showFillResult("success", `Filled ${response.filled} field${response.filled !== 1 ? "s" : ""}.${response.skipped > 0 ? ` ${response.skipped} field${response.skipped !== 1 ? "s" : ""} need your attention.` : ""}`);
+      showFillResult("success", `Filled ${response.filled} field${response.filled !== 1 ? "s" : ""}.${response.skipped > 0 ? ` ${response.skipped} skipped.` : ""}${jobSavedMsg}`);
     } else if (response?.no_fields) {
       autofillBadge.textContent = "No fields";
       autofillBadge.className = "badge badge-idle";
@@ -312,7 +320,7 @@ async function runAutofill() {
 
 async function saveJobToCareerLaunch(token, jobInfo) {
   try {
-    await fetch(`${BASE_URL}/api/extension/save-job`, {
+    const res = await fetch(`${BASE_URL}/api/extension/save-job`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -320,9 +328,11 @@ async function saveJobToCareerLaunch(token, jobInfo) {
       },
       body: JSON.stringify(jobInfo),
     });
+    if (res.ok) return res.json(); // { job, created }
   } catch {
     // best-effort — don't block the user if this fails
   }
+  return null;
 }
 
 async function sendAlert(token, alert) {
