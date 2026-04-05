@@ -1,13 +1,7 @@
-import { getAnthropicClient } from "./client";
+import { getGeminiClient, GEMINI_MODEL } from "@/lib/google/client";
 import type { ParsedResume } from "@/types/resume";
 
-export async function parseResumeText(rawText: string): Promise<ParsedResume> {
-  const client = getAnthropicClient();
-
-  const response = await client.messages.create({
-    model: "claude-sonnet-4-5-20251001",
-    max_tokens: 4096,
-    system: `You are a resume parsing assistant. Extract structured data from the provided resume text and return ONLY a valid JSON object — no markdown, no explanation, no code fences.
+const SYSTEM_PROMPT = `You are a resume parsing assistant. Extract structured data from the provided resume text and return ONLY a valid JSON object — no markdown, no explanation, no code fences.
 
 The JSON must match this exact schema:
 {
@@ -46,19 +40,23 @@ Rules:
 - Use empty string "" for missing string fields (never omit required keys)
 - Use empty array [] for missing array fields
 - Use null for end_date when the position is current
-- Do not invent data not present in the resume`,
-    messages: [
-      {
-        role: "user",
-        content: `Parse the following resume text into the required JSON structure:\n\n${rawText}`,
-      },
-    ],
+- Do not invent data not present in the resume`;
+
+export async function parseResumeText(rawText: string): Promise<ParsedResume> {
+  const genAI = getGeminiClient();
+  const model = genAI.getGenerativeModel({
+    model: GEMINI_MODEL,
+    systemInstruction: SYSTEM_PROMPT,
   });
 
-  const textBlock = response.content.find((b) => b.type === "text");
-  if (!textBlock || textBlock.type !== "text") {
-    throw new Error("No text response from AI");
-  }
+  const result = await model.generateContent(
+    `Parse the following resume text into the required JSON structure:\n\n${rawText}`
+  );
 
-  return JSON.parse(textBlock.text.trim()) as ParsedResume;
+  const text = result.response.text().trim();
+
+  // Strip markdown code fences if the model wraps in them despite instructions
+  const cleaned = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
+
+  return JSON.parse(cleaned) as ParsedResume;
 }

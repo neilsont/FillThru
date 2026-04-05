@@ -1,8 +1,14 @@
 import Link from "next/link";
+import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
-import { Rocket, FileText, Brain, Send, ArrowRight } from "lucide-react";
+import { Rocket, FileText, Brain, Send, ArrowRight, LayoutDashboard } from "lucide-react";
 
-export default function HomePage() {
+export default async function HomePage() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   return (
     <div className="min-h-full bg-white">
       <header className="border-b border-border/60">
@@ -14,12 +20,23 @@ export default function HomePage() {
             <span className="font-semibold text-[15px]">CareerLaunch</span>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" asChild>
-              <Link href="/login">Sign in</Link>
-            </Button>
-            <Button size="sm" asChild>
-              <Link href="/signup">Get started</Link>
-            </Button>
+            {user ? (
+              <Button size="sm" asChild>
+                <Link href="/dashboard">
+                  <LayoutDashboard className="h-3.5 w-3.5 mr-1.5" />
+                  Go to Dashboard
+                </Link>
+              </Button>
+            ) : (
+              <>
+                <Button variant="ghost" size="sm" asChild>
+                  <Link href="/login">Sign in</Link>
+                </Button>
+                <Button size="sm" asChild>
+                  <Link href="/signup">Get started</Link>
+                </Button>
+              </>
+            )}
           </div>
         </div>
       </header>
@@ -40,14 +57,24 @@ export default function HomePage() {
               tailored cover letters and auto-fill applications for you.
             </p>
             <div className="flex items-center justify-center gap-3">
-              <Button size="lg" asChild>
-                <Link href="/signup">
-                  Start for free <ArrowRight className="h-4 w-4 ml-1" />
-                </Link>
-              </Button>
-              <Button size="lg" variant="outline" asChild>
-                <Link href="/login">Sign in</Link>
-              </Button>
+              {user ? (
+                <Button size="lg" asChild>
+                  <Link href="/dashboard">
+                    Go to Dashboard <ArrowRight className="h-4 w-4 ml-1" />
+                  </Link>
+                </Button>
+              ) : (
+                <>
+                  <Button size="lg" asChild>
+                    <Link href="/signup">
+                      Start for free <ArrowRight className="h-4 w-4 ml-1" />
+                    </Link>
+                  </Button>
+                  <Button size="lg" variant="outline" asChild>
+                    <Link href="/login">Sign in</Link>
+                  </Button>
+                </>
+              )}
             </div>
           </div>
         </section>
@@ -60,7 +87,7 @@ export default function HomePage() {
                 {
                   icon: FileText,
                   title: "Upload Resume",
-                  description: "Upload your PDF resume and our AI extracts all your details into a structured profile.",
+                  description: "Upload your PDF or Word resume and our AI extracts all your details into a structured profile.",
                 },
                 {
                   icon: Brain,
@@ -89,7 +116,7 @@ export default function HomePage() {
 
         <section className="py-16 px-4 text-center">
           <p className="text-muted-foreground text-sm">
-            Built with Next.js, Supabase & Claude AI
+            Built with Next.js, Supabase & Gemini AI
           </p>
         </section>
       </main>

@@ -1,4 +1,4 @@
-import { getAnthropicClient } from "./client";
+import { getGeminiClient, GEMINI_MODEL } from "@/lib/google/client";
 import type { ParsedResume } from "@/types/resume";
 import type { FieldMapping } from "@/types/application";
 
@@ -7,12 +7,10 @@ export async function mapApplicationFields(
   resume: ParsedResume,
   supplemental: Record<string, string>
 ): Promise<FieldMapping[]> {
-  const client = getAnthropicClient();
-
-  const response = await client.messages.create({
-    model: "claude-sonnet-4-5-20251001",
-    max_tokens: 4096,
-    system: `You are an application field-filling assistant. Given a job description and candidate data, identify common application fields and fill them from the candidate's resume and supplemental data.
+  const genAI = getGeminiClient();
+  const model = genAI.getGenerativeModel({
+    model: GEMINI_MODEL,
+    systemInstruction: `You are an application field-filling assistant. Given a job description and candidate data, identify common application fields and fill them from the candidate's resume and supplemental data.
 
 For each field, provide:
 - field_key: machine-readable key (e.g., "full_name", "email", "years_experience")
@@ -24,27 +22,18 @@ For each field, provide:
 Common fields to map: full name, email, phone, location/address, linkedin, website/portfolio, years of experience, current title, desired salary, work authorization, willing to relocate, education level, skills summary.
 
 Return ONLY a JSON object with a "mappings" array. No markdown formatting.`,
-    messages: [
-      {
-        role: "user",
-        content: `JOB DESCRIPTION:
+  });
+
+  const result = await model.generateContent(`JOB DESCRIPTION:
 ${jobDescription}
 
 CANDIDATE RESUME:
 ${JSON.stringify(resume, null, 2)}
 
 SUPPLEMENTAL ANSWERS:
-${JSON.stringify(supplemental, null, 2)}`,
-      },
-    ],
-  });
+${JSON.stringify(supplemental, null, 2)}`);
 
-  const textBlock = response.content.find((b) => b.type === "text");
-  if (!textBlock || textBlock.type !== "text") {
-    throw new Error("No text response from AI");
-  }
-
-  let jsonStr = textBlock.text;
+  let jsonStr = result.response.text().trim();
   const jsonMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
   if (jsonMatch) {
     jsonStr = jsonMatch[1];
