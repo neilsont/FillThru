@@ -1,12 +1,11 @@
 "use client";
 
-import { useState } from "react";
 import { useAIStore } from "@/stores/ai-store";
 import { AI_MODELS } from "@/lib/ai/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { Bot, ChevronDown, CheckCircle2 } from "lucide-react";
+import { Bot, CheckCircle2 } from "lucide-react";
 
 function ProviderIcon({ provider, className }: { provider: string; className?: string }) {
   if (provider === "google") {
@@ -50,9 +49,6 @@ function ProviderIcon({ provider, className }: { provider: string; className?: s
 
 export function AIModelSelector() {
   const { selectedModel, setModel } = useAIStore();
-  const [open, setOpen] = useState(false);
-
-  const current = AI_MODELS.find((m) => m.id === selectedModel) ?? AI_MODELS[0];
 
   return (
     <Card className="mt-4 border-border/60">
@@ -66,40 +62,15 @@ export function AIModelSelector() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
-        <button
-          type="button"
-          onClick={() => setOpen((v) => !v)}
-          className="w-full flex items-center justify-between rounded-lg border border-border/60 bg-muted/30 px-4 py-3 text-sm hover:bg-muted/60 transition-colors"
-        >
-          <div className="flex items-center gap-3">
-            <div className={cn("flex items-center justify-center h-7 w-7 rounded-md text-white shrink-0", current.color)}>
-              <ProviderIcon provider={current.provider} className="h-3.5 w-3.5" />
-            </div>
-            <div className="text-left">
-              <p className="font-medium text-[13px]">{current.name}</p>
-              <p className="text-[11px] text-muted-foreground">{current.providerLabel}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Badge variant={current.badgeVariant} className="text-[10px] px-1.5 py-0">
-              {current.badge}
-            </Badge>
-            <ChevronDown className={cn("h-4 w-4 text-muted-foreground transition-transform duration-200", open && "rotate-180")} />
-          </div>
-        </button>
-
-        <div className={cn("overflow-hidden transition-all duration-300 ease-in-out", open ? "max-h-[600px] opacity-100" : "max-h-0 opacity-0")}>
-          <div className="space-y-2 pt-1">
-            {/* Free models first */}
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground px-1 pt-1">Free — works now</p>
-            {AI_MODELS.filter((m) => m.free).map((model) => (
-              <ModelOption key={model.id} model={model} selected={model.id === selectedModel} onSelect={() => { setModel(model.id); setOpen(false); }} />
-            ))}
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground px-1 pt-2">Requires billing</p>
-            {AI_MODELS.filter((m) => !m.free).map((model) => (
-              <ModelOption key={model.id} model={model} selected={model.id === selectedModel} onSelect={() => { setModel(model.id); setOpen(false); }} />
-            ))}
-          </div>
+        <div className="space-y-2">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground px-1">Free — works now</p>
+          {AI_MODELS.filter((m) => m.free).map((model) => (
+            <ModelOption key={model.id} model={model} selected={model.id === selectedModel} onSelect={() => setModel(model.id)} />
+          ))}
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground px-1 pt-2">Requires billing</p>
+          {AI_MODELS.filter((m) => !m.free).map((model) => (
+            <ModelOption key={model.id} model={model} selected={model.id === selectedModel} onSelect={() => setModel(model.id)} />
+          ))}
         </div>
       </CardContent>
     </Card>
