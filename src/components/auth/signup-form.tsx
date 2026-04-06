@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,30 +13,29 @@ import { OAuthButtons } from "./oauth-buttons";
 export function SignupForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [agreed, setAgreed] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const router = useRouter();
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (!agreed) {
+      setError("You must agree to the Terms of Service and Privacy Policy to continue.");
+      return;
+    }
     setError("");
     setLoading(true);
 
     try {
-      const res = await fetch("/api/auth/signup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
+      const supabase = createClient();
+      const { error: authError } = await supabase.auth.signUp({ email, password });
 
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || "Signup failed");
+      if (authError) {
+        setError(authError.message);
         return;
       }
 
-      router.push("/onboarding");
-      router.refresh();
+      window.location.href = "/onboarding";
     } catch {
       setError("Something went wrong");
     } finally {
@@ -91,9 +90,30 @@ export function SignupForm() {
               required
             />
           </div>
+          <div className="flex items-start gap-2.5 pt-1">
+            <input
+              id="agree"
+              type="checkbox"
+              checked={agreed}
+              onChange={(e) => setAgreed(e.target.checked)}
+              className="mt-0.5 h-4 w-4 shrink-0 accent-primary cursor-pointer"
+              required
+            />
+            <label htmlFor="agree" className="text-xs text-muted-foreground leading-snug cursor-pointer">
+              I agree to the{" "}
+              <Link href="/terms" target="_blank" className="text-primary font-medium hover:underline">
+                Terms of Service
+              </Link>{" "}
+              and{" "}
+              <Link href="/privacy" target="_blank" className="text-primary font-medium hover:underline">
+                Privacy Policy
+              </Link>
+              . I understand that CareerLaunch will store and process my resume and application data to provide its services.
+            </label>
+          </div>
         </CardContent>
         <CardFooter className="flex flex-col gap-4 pt-2">
-          <Button type="submit" className="w-full" disabled={loading}>
+          <Button type="submit" className="w-full" disabled={loading || !agreed}>
             {loading ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin mr-1" /> Creating account...

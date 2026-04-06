@@ -296,13 +296,14 @@ export default async function HomePage() {
             </div>
             
             <nav className="flex justify-center gap-8 mb-8 text-sm font-medium text-muted-foreground/60">
-              <Link href="#" className="hover:text-primary transition-colors">Privacy Policy</Link>
-              <Link href="#" className="hover:text-primary transition-colors">Terms of Service</Link>
-              <Link href="#" className="hover:text-primary transition-colors">Contact Support</Link>
+              <Link href="/privacy" className="hover:text-primary transition-colors">Privacy Policy</Link>
+              <Link href="/terms" className="hover:text-primary transition-colors">Terms of Service</Link>
+              <Link href="/faq" className="hover:text-primary transition-colors">FAQ</Link>
+              <a href="mailto:cosmispenguin2@gmail.com" className="hover:text-primary transition-colors">Contact Support</a>
             </nav>
 
             <p className="text-muted-foreground/40 text-xs font-medium">
-              Site Content &copy; 2026 Wilson Labs
+              Site Content &copy; 2026 Wilson Production
             </p>
           </div>
         </footer>
