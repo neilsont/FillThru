@@ -1,7 +1,15 @@
 import Stripe from "stripe";
 
-export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2025-03-31.basil",
-});
+let _stripe: Stripe | null = null;
 
-export const PREMIUM_PRICE_ID = process.env.STRIPE_PRICE_ID!;
+export function getStripe(): Stripe {
+  if (!_stripe) {
+    if (!process.env.STRIPE_SECRET_KEY) throw new Error("STRIPE_SECRET_KEY is not set");
+    _stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+      apiVersion: "2025-03-31.basil",
+    });
+  }
+  return _stripe;
+}
+
+export const PREMIUM_PRICE_ID = process.env.STRIPE_PRICE_ID ?? "";

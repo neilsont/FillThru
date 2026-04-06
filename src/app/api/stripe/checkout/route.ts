@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { stripe, PREMIUM_PRICE_ID } from "@/lib/stripe";
+import { getStripe, PREMIUM_PRICE_ID } from "@/lib/stripe";
 import { NextResponse } from "next/server";
 
 export async function POST() {
@@ -10,7 +10,6 @@ export async function POST() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Check for existing customer
   const { data: sub } = await supabase
     .from("user_subscriptions")
     .select("stripe_customer_id")
@@ -19,7 +18,7 @@ export async function POST() {
 
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL!;
 
-  const session = await stripe.checkout.sessions.create({
+  const session = await getStripe().checkout.sessions.create({
     mode: "subscription",
     payment_method_types: ["card"],
     customer: sub?.stripe_customer_id ?? undefined,
