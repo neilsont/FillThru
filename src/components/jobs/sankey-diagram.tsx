@@ -1,0 +1,406 @@
+"use client";
+
+import { useState, useMemo, useCallback, useRef } from "react";
+import { useJobs, useUpdateJob } from "@/hooks/use-jobs";
+import { useKanbanStore } from "@/stores/kanban-store";
+import { useToast } from "@/components/ui/toast";
+import { X, GripVertical, ExternalLink } from "lucide-react";
+import Link from "next/link";
+import type { Job, JobStatus } from "@/types/database";
+
+/* ── Sankey Node Definitions ─────────────────────────────────────────────── */
+
+interface SankeyNode {
+  id: JobStatus;
+  label: string;
+  color: string;
+  textColor: string;
+  x: number;  // column position (0-based)
+  order: number; // vertical order within the column
+}
+
+// Define the flow structure: source → target relationships
+interface FlowLink {
+  source: JobStatus;
+  target: JobStatus;
+}
+
+const SANKEY_NODES: SankeyNode[] = [
+  { id: "discovered",   label: "Discovered",   color: "#94a3b8", textColor: "#334155", x: 0, order: 0 },
+  { id: "in_progress",  label: "In Progress",  color: "#3b82f6", textColor: "#1e3a5f", x: 1, order: 0 },
+  { id: "applied",      label: "Applied",      color: "#6366f1", textColor: "#312e81", x: 2, order: 0 },
+  { id: "interviewing", label: "Interviewing", color: "#8b5cf6", textColor: "#4c1d95", x: 3, order: 0 },
+  { id: "offer",        label: "#22c55e",      color: "#22c55e", textColor: "#14532d", x: 4, order: 0 },
+  { id: "rejected",     label: "Rejected",     color: "#ef4444", textColor: "#7f1d1d", x: 4, order: 1 },
+];
+
+// Fix: the "offer" node label
+SANKEY_NODES[4].label = "Offer";
+
+const FLOW_LINKS: FlowLink[] = [
+  { source: "discovered",   target: "in_progress" },
+  { source: "in_progress",  target: "applied" },
+  { source: "applied",      target: "interviewing" },
+  { source: "applied",      target: "rejected" },
+  { source: "interviewing", target: "offer" },
+  { source: "interviewing", target: "rejected" },
+];
+
+/* ── Layout Constants ────────────────────────────────────────────────────── */
+
+const SVG_WIDTH = 900;
+const SVG_HEIGHT = 340;
+const NODE_WIDTH = 28;
+const NODE_MIN_HEIGHT = 40;
+const NODE_PADDING = 30;
+const COLUMN_GAP = (SVG_WIDTH - NODE_WIDTH) / 4; // 5 columns (0-4)
+
+/* ── Helpers ──────────────────────────────────────────────────────────────── */
+
+function getNodeX(col: number): number {
+  return col * COLUMN_GAP;
+}
+
+// Curved path between two points for the flow links
+function sankeyPath(
+  x0: number, y0: number, h0: number,
+  x1: number, y1: number, h1: number
+): string {
+  const midX = (x0 + x1) / 2;
+  return [
+    `M ${x0},${y0}`,
+    `C ${midX},${y0} ${midX},${y1} ${x1},${y1}`,
+    `L ${x1},${y1 + h1}`,
+    `C ${midX},${y1 + h1} ${midX},${y0 + h0} ${x0},${y0 + h0}`,
+    `Z`,
+  ].join(" ");
+}
+
+/* ── Component ────────────────────────────────────────────────────────────── */
+
+export function SankeyDiagram() {
+  const { data: jobs = [], isLoading } = useJobs();
+  const updateJob = useUpdateJob();
+  const { toast } = useToast();
+  const [selectedNode, setSelectedNode] = useState<JobStatus | null>(null);
+  const [hoveredNode, setHoveredNode] = useState<JobStatus | null>(null);
+  const [dragOverNode, setDragOverNode] = useState<JobStatus | null>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
+
+  // Count jobs per status
+  const counts = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const node of SANKEY_NODES) map[node.id] = 0;
+    for (const job of jobs) {
+      if (map[job.status] !== undefined) map[job.status]++;
+    }
+    return map;
+  }, [jobs]);
+
+  const totalJobs = jobs.length;
+
+  // Calculate node heights proportional to count
+  const nodeLayouts = useMemo(() => {
+    const maxCount = Math.max(...Object.values(counts), 1);
+    const maxNodeHeight = SVG_HEIGHT - 100;
+
+    // Group nodes by column
+    const columns: Record<number, SankeyNode[]> = {};
+    for (const n of SANKEY_NODES) {
+      if (!columns[n.x]) columns[n.x] = [];
+      columns[n.x].push(n);
+    }
+
+    const layouts: Record<string, { x: number; y: number; width: number; height: number }> = {};
+
+    for (const [colStr, nodes] of Object.entries(columns)) {
+      const col = Number(colStr);
+      const x = getNodeX(col);
+
+      if (nodes.length === 1) {
+        const n = nodes[0];
+        const h = Math.max(NODE_MIN_HEIGHT, (counts[n.id] / Math.max(maxCount, 1)) * maxNodeHeight);
+        layouts[n.id] = { x, y: (SVG_HEIGHT - h) / 2, width: NODE_WIDTH, height: h };
+      } else {
+        // Multiple nodes in the same column (e.g., offer + rejected)
+        const totalCount = nodes.reduce((s, n) => s + counts[n.id], 0);
+        const availableHeight = SVG_HEIGHT - NODE_PADDING * (nodes.length - 1);
+        let currentY = 20;
+
+        for (const n of nodes) {
+          const h = totalCount > 0
+            ? Math.max(NODE_MIN_HEIGHT, (counts[n.id] / totalCount) * availableHeight)
+            : NODE_MIN_HEIGHT;
+          layouts[n.id] = { x, y: currentY, width: NODE_WIDTH, height: h };
+          currentY += h + NODE_PADDING;
+        }
+      }
+    }
+
+    return layouts;
+  }, [counts]);
+
+  // Calculate flow link geometries
+  const linkPaths = useMemo(() => {
+    return FLOW_LINKS.map((link) => {
+      const src = nodeLayouts[link.source];
+      const tgt = nodeLayouts[link.target];
+      if (!src || !tgt) return null;
+
+      const srcCount = counts[link.source] || 0;
+      const tgtCount = counts[link.target] || 0;
+      const flowCount = Math.min(srcCount, tgtCount);
+
+      // Calculate the thickness of the flow proportionally
+      const maxCount = Math.max(...Object.values(counts), 1);
+      const thickness = Math.max(4, (flowCount / maxCount) * 60);
+
+      // Source exits from right side center, target enters from left side center
+      const x0 = src.x + src.width;
+      const y0 = src.y + src.height / 2 - thickness / 2;
+      const x1 = tgt.x;
+      const y1 = tgt.y + tgt.height / 2 - thickness / 2;
+
+      const srcNode = SANKEY_NODES.find((n) => n.id === link.source)!;
+      const tgtNode = SANKEY_NODES.find((n) => n.id === link.target)!;
+
+      return {
+        ...link,
+        path: sankeyPath(x0, y0, thickness, x1, y1, thickness),
+        flowCount,
+        color: tgtNode.color,
+        srcLabel: srcNode.label,
+        tgtLabel: tgtNode.label,
+      };
+    }).filter(Boolean);
+  }, [nodeLayouts, counts]);
+
+  // Handle drag and drop
+  const handleDragOver = useCallback((e: React.DragEvent, nodeId: JobStatus) => {
+    e.preventDefault();
+    setDragOverNode(nodeId);
+  }, []);
+
+  const handleDragLeave = useCallback(() => {
+    setDragOverNode(null);
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent, targetStatus: JobStatus) => {
+    e.preventDefault();
+    const jobId = e.dataTransfer.getData("text/plain");
+    if (jobId) {
+      updateJob.mutate(
+        { id: jobId, status: targetStatus },
+        {
+          onSuccess: () => {
+            toast({ title: `Job moved to ${SANKEY_NODES.find((n) => n.id === targetStatus)?.label}` });
+          },
+        }
+      );
+    }
+    setDragOverNode(null);
+  }, [updateJob, toast]);
+
+  // Handle drag start from the job list panel
+  const handleJobDragStart = useCallback((e: React.DragEvent, jobId: string) => {
+    e.dataTransfer.setData("text/plain", jobId);
+    e.dataTransfer.effectAllowed = "move";
+  }, []);
+
+  // Jobs filtered by selected node
+  const selectedJobs = useMemo(() => {
+    if (!selectedNode) return [];
+    return jobs.filter((j) => j.status === selectedNode);
+  }, [jobs, selectedNode]);
+
+  if (isLoading || totalJobs === 0) return null;
+
+  return (
+    <div className="hidden lg:block mt-6 rounded-2xl border border-border/50 bg-white p-6 shadow-sm">
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h3 className="text-base font-bold text-primary">Application Flow</h3>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Click a stage to view jobs · Drag jobs between stages to update status
+          </p>
+        </div>
+        <div className="text-xs font-semibold text-muted-foreground bg-muted/50 px-3 py-1 rounded-full">
+          {totalJobs} total job{totalJobs !== 1 ? "s" : ""}
+        </div>
+      </div>
+
+      {/* ── SVG Sankey ─────────────────────────────────────────────────────── */}
+      <div className="relative overflow-x-auto">
+        <svg
+          ref={svgRef}
+          viewBox={`0 0 ${SVG_WIDTH} ${SVG_HEIGHT}`}
+          className="w-full max-w-[900px] mx-auto"
+          style={{ minWidth: 600 }}
+        >
+          {/* Flow links */}
+          {linkPaths.map((link, i) => link && (
+            <g key={i}>
+              <path
+                d={link.path}
+                fill={link.color}
+                opacity={
+                  hoveredNode
+                    ? (hoveredNode === link.source || hoveredNode === link.target ? 0.35 : 0.08)
+                    : 0.18
+                }
+                className="transition-opacity duration-200"
+              />
+            </g>
+          ))}
+
+          {/* Nodes */}
+          {SANKEY_NODES.map((node) => {
+            const layout = nodeLayouts[node.id];
+            if (!layout) return null;
+            const count = counts[node.id];
+            const isHovered = hoveredNode === node.id;
+            const isDragTarget = dragOverNode === node.id;
+            const isSelected = selectedNode === node.id;
+
+            return (
+              <g
+                key={node.id}
+                className="cursor-pointer"
+                onMouseEnter={() => setHoveredNode(node.id)}
+                onMouseLeave={() => setHoveredNode(null)}
+                onClick={() => setSelectedNode(selectedNode === node.id ? null : node.id)}
+                onDragOver={(e) => handleDragOver(e as unknown as React.DragEvent, node.id)}
+                onDragLeave={handleDragLeave}
+                onDrop={(e) => handleDrop(e as unknown as React.DragEvent, node.id)}
+              >
+                {/* Node bar */}
+                <rect
+                  x={layout.x}
+                  y={layout.y}
+                  width={layout.width}
+                  height={layout.height}
+                  rx={6}
+                  fill={node.color}
+                  opacity={isHovered || isDragTarget || isSelected ? 1 : 0.85}
+                  stroke={isDragTarget ? "#b8941f" : isSelected ? node.color : "transparent"}
+                  strokeWidth={isDragTarget || isSelected ? 3 : 0}
+                  className="transition-all duration-200"
+                />
+                {/* Glow effect on drag target */}
+                {isDragTarget && (
+                  <rect
+                    x={layout.x - 4}
+                    y={layout.y - 4}
+                    width={layout.width + 8}
+                    height={layout.height + 8}
+                    rx={9}
+                    fill="none"
+                    stroke="#b8941f"
+                    strokeWidth={2}
+                    opacity={0.5}
+                    className="animate-pulse"
+                  />
+                )}
+                {/* Label */}
+                <text
+                  x={layout.x + layout.width / 2}
+                  y={layout.y - 10}
+                  textAnchor="middle"
+                  className="text-[11px] font-semibold fill-foreground"
+                  style={{ userSelect: "none" }}
+                >
+                  {node.label}
+                </text>
+                {/* Count */}
+                <text
+                  x={layout.x + layout.width / 2}
+                  y={layout.y + layout.height / 2 + 5}
+                  textAnchor="middle"
+                  className="text-[13px] font-bold"
+                  fill="white"
+                  style={{ userSelect: "none" }}
+                >
+                  {count}
+                </text>
+              </g>
+            );
+          })}
+        </svg>
+      </div>
+
+      {/* ── Detail Panel (visible when a node is clicked) ──────────────────── */}
+      {selectedNode && (
+        <div className="mt-4 border-t border-border/40 pt-4 animate-in fade-in slide-in-from-top-2 duration-200">
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="text-sm font-bold text-primary flex items-center gap-2">
+              <div
+                className="h-3 w-3 rounded-sm"
+                style={{ backgroundColor: SANKEY_NODES.find((n) => n.id === selectedNode)?.color }}
+              />
+              {SANKEY_NODES.find((n) => n.id === selectedNode)?.label}
+              <span className="text-muted-foreground font-normal">
+                ({selectedJobs.length} job{selectedJobs.length !== 1 ? "s" : ""})
+              </span>
+            </h4>
+            <button
+              onClick={() => setSelectedNode(null)}
+              className="text-muted-foreground hover:text-foreground transition-colors p-1 rounded-md hover:bg-muted"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+
+          {selectedJobs.length === 0 ? (
+            <p className="text-sm text-muted-foreground italic py-4 text-center">
+              No jobs in this stage yet.
+            </p>
+          ) : (
+            <div className="grid gap-2 max-h-[250px] overflow-y-auto pr-1">
+              {selectedJobs.map((job) => (
+                <SankeyJobItem
+                  key={job.id}
+                  job={job}
+                  onDragStart={handleJobDragStart}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Job Item (inside the detail panel) ──────────────────────────────────── */
+
+function SankeyJobItem({
+  job,
+  onDragStart,
+}: {
+  job: Job;
+  onDragStart: (e: React.DragEvent, jobId: string) => void;
+}) {
+  return (
+    <div
+      draggable
+      onDragStart={(e) => onDragStart(e, job.id)}
+      className="flex items-center gap-3 p-3 rounded-xl border border-border/40 bg-muted/20 hover:bg-muted/50 hover:border-accent/30 transition-all group cursor-grab active:cursor-grabbing"
+    >
+      <div className="text-muted-foreground/40 group-hover:text-accent/60 transition-colors">
+        <GripVertical className="h-4 w-4" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium truncate">{job.title}</p>
+        <p className="text-xs text-muted-foreground truncate">{job.company}{job.location ? ` · ${job.location}` : ""}</p>
+      </div>
+      <Link
+        href={`/dashboard/jobs/${job.id}`}
+        className="text-muted-foreground hover:text-primary transition-colors p-1.5 rounded-md hover:bg-white"
+        onClick={(e) => e.stopPropagation()}
+        draggable={false}
+      >
+        <ExternalLink className="h-3.5 w-3.5" />
+      </Link>
+    </div>
+  );
+}
