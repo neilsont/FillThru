@@ -148,9 +148,9 @@ export function SankeyDiagram() {
       const tgtCount = counts[link.target] || 0;
       const flowCount = Math.min(srcCount, tgtCount);
 
-      // Calculate the thickness of the flow proportionally — wider links
+      // Calculate the thickness of the flow proportionally — bolder links
       const maxCount = Math.max(...Object.values(counts), 1);
-      const thickness = Math.max(10, (flowCount / maxCount) * 90);
+      const thickness = Math.max(24, (flowCount / maxCount) * 120);
 
       // Source exits from right side center, target enters from left side center
       const x0 = src.x + src.width;
