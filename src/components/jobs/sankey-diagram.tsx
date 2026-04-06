@@ -30,12 +30,9 @@ const SANKEY_NODES: SankeyNode[] = [
   { id: "in_progress",  label: "In Progress",  color: "#3b82f6", textColor: "#1e3a5f", x: 1, order: 0 },
   { id: "applied",      label: "Applied",      color: "#6366f1", textColor: "#312e81", x: 2, order: 0 },
   { id: "interviewing", label: "Interviewing", color: "#8b5cf6", textColor: "#4c1d95", x: 3, order: 0 },
-  { id: "offer",        label: "#22c55e",      color: "#22c55e", textColor: "#14532d", x: 4, order: 0 },
+  { id: "offer",        label: "Offer",        color: "#22c55e", textColor: "#14532d", x: 4, order: 0 },
   { id: "rejected",     label: "Rejected",     color: "#ef4444", textColor: "#7f1d1d", x: 4, order: 1 },
 ];
-
-// Fix: the "offer" node label
-SANKEY_NODES[4].label = "Offer";
 
 const FLOW_LINKS: FlowLink[] = [
   { source: "discovered",   target: "in_progress" },
@@ -48,17 +45,19 @@ const FLOW_LINKS: FlowLink[] = [
 
 /* ── Layout Constants ────────────────────────────────────────────────────── */
 
-const SVG_WIDTH = 900;
-const SVG_HEIGHT = 340;
-const NODE_WIDTH = 28;
-const NODE_MIN_HEIGHT = 40;
+const SVG_PADDING_X = 60; // padding on left/right so labels don't clip
+const SVG_WIDTH = 960;
+const SVG_HEIGHT = 360;
+const NODE_WIDTH = 32;
+const NODE_MIN_HEIGHT = 44;
 const NODE_PADDING = 30;
-const COLUMN_GAP = (SVG_WIDTH - NODE_WIDTH) / 4; // 5 columns (0-4)
+const DRAW_WIDTH = SVG_WIDTH - SVG_PADDING_X * 2; // drawable area
+const COLUMN_GAP = DRAW_WIDTH / 4; // 5 columns (0-4)
 
 /* ── Helpers ──────────────────────────────────────────────────────────────── */
 
 function getNodeX(col: number): number {
-  return col * COLUMN_GAP;
+  return SVG_PADDING_X + col * COLUMN_GAP;
 }
 
 // Curved path between two points for the flow links
@@ -151,9 +150,9 @@ export function SankeyDiagram() {
       const tgtCount = counts[link.target] || 0;
       const flowCount = Math.min(srcCount, tgtCount);
 
-      // Calculate the thickness of the flow proportionally
+      // Calculate the thickness of the flow proportionally — wider links
       const maxCount = Math.max(...Object.values(counts), 1);
-      const thickness = Math.max(4, (flowCount / maxCount) * 60);
+      const thickness = Math.max(10, (flowCount / maxCount) * 90);
 
       // Source exits from right side center, target enters from left side center
       const x0 = src.x + src.width;
