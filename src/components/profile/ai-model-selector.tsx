@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Bot, CheckCircle2, Lock, Sparkles } from "lucide-react";
+import { useToast } from "@/components/ui/toast";
 
 function ProviderIcon({ provider, className }: { provider: string; className?: string }) {
   if (provider === "google") {
@@ -52,6 +53,7 @@ export function AIModelSelector() {
   const { selectedModel, setModel } = useAIStore();
   const [isPremium, setIsPremium] = useState(false);
   const [upgrading, setUpgrading] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     fetch("/api/stripe/status")
@@ -65,7 +67,13 @@ export function AIModelSelector() {
     try {
       const res = await fetch("/api/stripe/checkout", { method: "POST" });
       const data = await res.json();
-      if (data.url) window.location.href = data.url;
+      if (data.url) {
+        window.location.href = data.url;
+      } else if (data.error) {
+        toast({ title: "Checkout Error", description: data.error, variant: "destructive" });
+      }
+    } catch (err) {
+      toast({ title: "Error", description: "Failed to connect to checkout.", variant: "destructive" });
     } finally {
       setUpgrading(false);
     }
