@@ -206,7 +206,7 @@ export default function FAQPage() {
       </main>
 
       <footer className="border-t border-border/40 py-8 text-center text-xs text-muted-foreground/50 mt-16">
-        &copy; 2026 Wilson Production. All rights reserved.{" "}
+        &copy; 2026 Wilson Digital. All rights reserved.{" "}
         <Link href="/terms" className="hover:text-primary transition-colors">Terms of Service</Link>{" · "}
         <Link href="/privacy" className="hover:text-primary transition-colors">Privacy Policy</Link>{" · "}
         <Link href="/faq" className="hover:text-primary transition-colors">FAQ</Link>

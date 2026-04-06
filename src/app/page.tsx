@@ -303,7 +303,7 @@ export default async function HomePage() {
             </nav>
 
             <p className="text-muted-foreground/40 text-xs font-medium">
-              Site Content &copy; 2026 Wilson Production
+              Site Content &copy; 2026 Wilson Digital
             </p>
           </div>
         </footer>

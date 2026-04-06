@@ -28,7 +28,7 @@ export default function TermsOfServicePage() {
           <section>
             <h2 className="text-xl font-bold text-primary mb-3">1. Acceptance of Terms</h2>
             <p>
-              By creating an account or using CareerLaunch (the &ldquo;Service&rdquo;), operated by Wilson Production, you agree to be bound by these Terms of Service (&ldquo;Terms&rdquo;). If you do not agree to these Terms, do not use the Service.
+              By creating an account or using CareerLaunch (the &ldquo;Service&rdquo;), operated by Wilson Digital, you agree to be bound by these Terms of Service (&ldquo;Terms&rdquo;). If you do not agree to these Terms, do not use the Service.
             </p>
             <p className="mt-3">
               These Terms apply to all visitors, users, and others who access or use the Service. We reserve the right to update these Terms at any time. Continued use after changes are posted constitutes your acceptance of the updated Terms.
@@ -97,7 +97,7 @@ export default function TermsOfServicePage() {
               <li>Refund requests for exceptional circumstances should be directed to <a href="mailto:cosmispenguin2@gmail.com" className="text-primary underline">cosmispenguin2@gmail.com</a>.</li>
             </ul>
             <p className="mt-3">
-              All payments are processed securely by Stripe. Wilson Production does not store your payment card information.
+              All payments are processed securely by Stripe. Wilson Digital does not store your payment card information.
             </p>
           </section>
 
@@ -117,7 +117,7 @@ export default function TermsOfServicePage() {
           <section>
             <h2 className="text-xl font-bold text-primary mb-3">8. Intellectual Property</h2>
             <p>
-              The Service and its original content, features, and functionality are and will remain the exclusive property of Wilson Production. Our trademarks and trade dress may not be used in connection with any product or service without our prior written consent.
+              The Service and its original content, features, and functionality are and will remain the exclusive property of Wilson Digital. Our trademarks and trade dress may not be used in connection with any product or service without our prior written consent.
             </p>
             <p className="mt-3">
               You retain ownership of all content you upload (resumes, documents, etc.). By uploading content, you grant us a limited, non-exclusive license to use it solely to provide the Service to you.
@@ -156,7 +156,7 @@ export default function TermsOfServicePage() {
             <h2 className="text-xl font-bold text-primary mb-3">13. Contact</h2>
             <p>For questions about these Terms, please contact:</p>
             <div className="mt-3 p-4 bg-white rounded-xl border border-border/50">
-              <p className="font-semibold text-foreground">Wilson Production</p>
+              <p className="font-semibold text-foreground">Wilson Digital</p>
               <p>CareerLaunch Support</p>
               <a href="mailto:cosmispenguin2@gmail.com" className="text-primary underline">cosmispenguin2@gmail.com</a>
             </div>
@@ -166,7 +166,7 @@ export default function TermsOfServicePage() {
       </main>
 
       <footer className="border-t border-border/40 py-8 text-center text-xs text-muted-foreground/50 mt-16">
-        &copy; 2026 Wilson Production. All rights reserved.{" "}
+        &copy; 2026 Wilson Digital. All rights reserved.{" "}
         <Link href="/terms" className="hover:text-primary transition-colors">Terms of Service</Link>{" · "}
         <Link href="/privacy" className="hover:text-primary transition-colors">Privacy Policy</Link>
       </footer>

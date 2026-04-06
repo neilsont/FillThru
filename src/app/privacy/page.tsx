@@ -28,7 +28,7 @@ export default function PrivacyPolicyPage() {
           <section>
             <h2 className="text-xl font-bold text-primary mb-3">1. Introduction</h2>
             <p>
-              Welcome to CareerLaunch, operated by Wilson Production (&ldquo;we,&rdquo; &ldquo;our,&rdquo; or &ldquo;us&rdquo;). We are committed to protecting your personal information and your right to privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our website and browser extension (collectively, the &ldquo;Service&rdquo;).
+              Welcome to CareerLaunch, operated by Wilson Digital (&ldquo;we,&rdquo; &ldquo;our,&rdquo; or &ldquo;us&rdquo;). We are committed to protecting your personal information and your right to privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our website and browser extension (collectively, the &ldquo;Service&rdquo;).
             </p>
             <p className="mt-3">
               By using CareerLaunch, you agree to the collection and use of information in accordance with this policy. If you do not agree, please do not use our Service.
@@ -150,7 +150,7 @@ export default function PrivacyPolicyPage() {
               If you have questions or concerns about this Privacy Policy, please contact us at:
             </p>
             <div className="mt-3 p-4 bg-white rounded-xl border border-border/50">
-              <p className="font-semibold text-foreground">Wilson Production</p>
+              <p className="font-semibold text-foreground">Wilson Digital</p>
               <p>CareerLaunch Support</p>
               <a href="mailto:cosmispenguin2@gmail.com" className="text-primary underline">cosmispenguin2@gmail.com</a>
             </div>
@@ -159,7 +159,7 @@ export default function PrivacyPolicyPage() {
       </main>
 
       <footer className="border-t border-border/40 py-8 text-center text-xs text-muted-foreground/50 mt-16">
-        &copy; 2026 Wilson Production. All rights reserved.{" "}
+        &copy; 2026 Wilson Digital. All rights reserved.{" "}
         <Link href="/terms" className="hover:text-primary transition-colors">Terms of Service</Link>{" · "}
         <Link href="/privacy" className="hover:text-primary transition-colors">Privacy Policy</Link>
       </footer>
