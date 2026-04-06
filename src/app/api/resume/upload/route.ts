@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { parseResumeText } from "@/lib/ai";
 import type { AIModel } from "@/lib/ai/types";
 import { DEFAULT_MODEL } from "@/lib/ai/types";
+import { isPaidModel, userIsPremium } from "@/lib/subscription";
 import { NextResponse } from "next/server";
 export const maxDuration = 60;
 
@@ -58,6 +59,11 @@ export async function POST(request: Request) {
     }
 
     const model = (formData.get("model") as AIModel | null) ?? DEFAULT_MODEL;
+
+    if (isPaidModel(model) && !(await userIsPremium(supabase, user.id))) {
+      return NextResponse.json({ error: "premium_required" }, { status: 402 });
+    }
+
     const isPDF = file.type === "application/pdf";
     const ext = isPDF ? "pdf" : "docx";
     const buffer = Buffer.from(await file.arrayBuffer());

@@ -3,6 +3,7 @@ import { mapApplicationFields } from "@/lib/ai";
 import type { ParsedResume } from "@/types/resume";
 import type { AIModel } from "@/lib/ai/types";
 import { DEFAULT_MODEL } from "@/lib/ai/types";
+import { isPaidModel, userIsPremium } from "@/lib/subscription";
 import { NextResponse } from "next/server";
 
 export async function POST(request: Request) {
@@ -17,6 +18,10 @@ export async function POST(request: Request) {
     }
 
     const { job_id, model = DEFAULT_MODEL } = await request.json();
+
+    if (isPaidModel(model as AIModel) && !(await userIsPremium(supabase, user.id))) {
+      return NextResponse.json({ error: "premium_required" }, { status: 402 });
+    }
 
     // Fetch job
     const { data: job } = await supabase

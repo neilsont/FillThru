@@ -1,11 +1,13 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useAIStore } from "@/stores/ai-store";
 import { AI_MODELS } from "@/lib/ai/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { Bot, CheckCircle2 } from "lucide-react";
+import { Bot, CheckCircle2, Lock, Sparkles } from "lucide-react";
 
 function ProviderIcon({ provider, className }: { provider: string; className?: string }) {
   if (provider === "google") {
@@ -39,7 +41,6 @@ function ProviderIcon({ provider, className }: { provider: string; className?: s
       </svg>
     );
   }
-  // openrouter
   return (
     <svg viewBox="0 0 24 24" className={cn("fill-current", className)} aria-hidden="true">
       <path d="M3 12l4-4v3h7.5a4.5 4.5 0 0 1 0 9H12v-2h2.5a2.5 2.5 0 0 0 0-5H7v3L3 12zm18 0l-4 4v-3H9.5a4.5 4.5 0 0 1 0-9H12v2H9.5a2.5 2.5 0 0 0 0 5H17V9l4 3z"/>
@@ -49,6 +50,26 @@ function ProviderIcon({ provider, className }: { provider: string; className?: s
 
 export function AIModelSelector() {
   const { selectedModel, setModel } = useAIStore();
+  const [isPremium, setIsPremium] = useState(false);
+  const [upgrading, setUpgrading] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/stripe/status")
+      .then((r) => r.json())
+      .then((d) => setIsPremium(d.isPremium ?? false))
+      .catch(() => {});
+  }, []);
+
+  async function handleUpgrade() {
+    setUpgrading(true);
+    try {
+      const res = await fetch("/api/stripe/checkout", { method: "POST" });
+      const data = await res.json();
+      if (data.url) window.location.href = data.url;
+    } finally {
+      setUpgrading(false);
+    }
+  }
 
   return (
     <Card className="mt-4 border-border/60">
@@ -65,26 +86,81 @@ export function AIModelSelector() {
         <div className="space-y-2">
           <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground px-1">Free — works now</p>
           {AI_MODELS.filter((m) => m.free).map((model) => (
-            <ModelOption key={model.id} model={model} selected={model.id === selectedModel} onSelect={() => setModel(model.id)} />
+            <ModelOption
+              key={model.id}
+              model={model}
+              selected={model.id === selectedModel}
+              locked={false}
+              onSelect={() => setModel(model.id)}
+            />
           ))}
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground px-1 pt-2">Requires billing</p>
+
+          <div className="flex items-center justify-between px-1 pt-2">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Premium — advanced models
+            </p>
+            {!isPremium && (
+              <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-accent/40 text-accent">
+                $9.99/mo
+              </Badge>
+            )}
+            {isPremium && (
+              <Badge variant="default" className="text-[10px] px-1.5 py-0 bg-accent">
+                Active
+              </Badge>
+            )}
+          </div>
+
           {AI_MODELS.filter((m) => !m.free).map((model) => (
-            <ModelOption key={model.id} model={model} selected={model.id === selectedModel} onSelect={() => setModel(model.id)} />
+            <ModelOption
+              key={model.id}
+              model={model}
+              selected={model.id === selectedModel}
+              locked={!isPremium}
+              onSelect={() => isPremium && setModel(model.id)}
+            />
           ))}
+
+          {!isPremium && (
+            <Button
+              size="sm"
+              className="w-full mt-2 rounded-lg bg-accent hover:bg-accent/90 text-white font-semibold"
+              onClick={handleUpgrade}
+              disabled={upgrading}
+            >
+              <Sparkles className="h-3.5 w-3.5 mr-1.5" />
+              {upgrading ? "Redirecting…" : "Upgrade to Premium"}
+            </Button>
+          )}
         </div>
       </CardContent>
     </Card>
   );
 }
 
-function ModelOption({ model, selected, onSelect }: { model: (typeof AI_MODELS)[0]; selected: boolean; onSelect: () => void }) {
+function ModelOption({
+  model,
+  selected,
+  locked,
+  onSelect,
+}: {
+  model: (typeof AI_MODELS)[0];
+  selected: boolean;
+  locked: boolean;
+  onSelect: () => void;
+}) {
   return (
     <button
       type="button"
       onClick={onSelect}
+      disabled={locked}
       className={cn(
         "w-full flex items-center gap-3 rounded-lg border px-4 py-3 text-left transition-colors",
-        selected ? "border-primary/50 bg-primary/5" : "border-border/60 hover:border-border hover:bg-muted/40"
+        locked
+          ? "border-border/40 bg-muted/20 opacity-60 cursor-not-allowed"
+          : selected
+          ? "border-primary/50 bg-primary/5"
+          : "border-border/60 hover:border-border hover:bg-muted/40"
       )}
     >
       <div className={cn("flex items-center justify-center h-8 w-8 rounded-md text-white shrink-0", model.color)}>
@@ -97,7 +173,11 @@ function ModelOption({ model, selected, onSelect }: { model: (typeof AI_MODELS)[
         </div>
         <p className="text-[11px] text-muted-foreground leading-relaxed">{model.description}</p>
       </div>
-      {selected && <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />}
+      {locked ? (
+        <Lock className="h-4 w-4 text-muted-foreground shrink-0" />
+      ) : selected ? (
+        <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
+      ) : null}
     </button>
   );
 }

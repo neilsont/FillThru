@@ -201,8 +201,8 @@ export default async function HomePage() {
                 </div>
                 
                 <h2 className="text-4xl md:text-5xl font-bold text-primary leading-tight">
-                  Fill applications without <br />
-                  <span className="text-accent underline decoration-accent/30 underline-offset-8">lifting a finger</span>
+                  Fill applications faster, <br />
+                  <span className="text-accent underline decoration-accent/30 underline-offset-8">with less effort</span>
                 </h2>
                 
                 <ul className="space-y-4">
@@ -222,7 +222,7 @@ export default async function HomePage() {
                 </ul>
 
                 <Button size="lg" className="rounded-full bg-primary shadow-xl stagger-2" asChild>
-                  <Link href="/dashboard">Install Browser Extension</Link>
+                  <Link href="https://chromewebstore.google.com" target="_blank" rel="noopener noreferrer">Install Browser Extension</Link>
                 </Button>
               </div>
 
