@@ -10,16 +10,26 @@ export async function GET(request: Request) {
     if (code) {
       const supabase = await createClient();
       const { error } = await supabase.auth.exchangeCodeForSession(code);
+      
+      const successHtml = `
+      <!DOCTYPE html>
+      <html>
+        <head><meta charset="utf-8"/><title>Redirecting...</title></head>
+        <body>
+          <script>window.location.replace("${origin}${next}");</script>
+        </body>
+      </html>
+      `;
 
       if (!error) {
-        return NextResponse.redirect(`${origin}${next}`);
+        return new NextResponse(successHtml, { headers: { "Content-Type": "text/html" } });
       }
 
       // Retry once for mobile browsers with cookie timing issues
       await new Promise((r) => setTimeout(r, 500));
       const { error: retryError } = await supabase.auth.exchangeCodeForSession(code);
       if (!retryError) {
-        return NextResponse.redirect(`${origin}${next}`);
+        return new NextResponse(successHtml, { headers: { "Content-Type": "text/html" } });
       }
 
       console.error("Auth callback exchange error:", retryError);

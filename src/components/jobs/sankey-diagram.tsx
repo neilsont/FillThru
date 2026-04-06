@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useMemo, useCallback, useRef } from "react";
+import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { useJobs, useUpdateJob } from "@/hooks/use-jobs";
 import { useKanbanStore } from "@/stores/kanban-store";
 import { useToast } from "@/components/ui/toast";
-import { X, GripVertical, ExternalLink } from "lucide-react";
+import { X, GripVertical, ExternalLink, Lock, Sparkles } from "lucide-react";
+import { cn } from "@/lib/utils";
 import Link from "next/link";
 import type { Job, JobStatus } from "@/types/database";
 
@@ -78,6 +79,14 @@ function sankeyPath(
 export function SankeyDiagram() {
   const { data: jobs = [], isLoading } = useJobs();
   const updateJob = useUpdateJob();
+  const [isPremium, setIsPremium] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/stripe/status")
+      .then((r) => r.json())
+      .then((d) => setIsPremium(d.isPremium ?? false))
+      .catch(() => {});
+  }, []);
   const { toast } = useToast();
   const [selectedNode, setSelectedNode] = useState<JobStatus | null>(null);
   const [hoveredNode, setHoveredNode] = useState<JobStatus | null>(null);
@@ -213,20 +222,36 @@ export function SankeyDiagram() {
   if (isLoading || totalJobs === 0) return null;
 
   return (
-    <div className="mt-6 rounded-2xl border border-border/50 bg-white p-6 shadow-sm">
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h3 className="text-base font-bold text-primary">Application Flow</h3>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Click a stage to view jobs · Drag jobs between stages to update status
+    <div className="mt-6 rounded-2xl bg-white shadow-sm overflow-hidden relative border border-border/50">
+      {!isPremium && (
+        <div className="block lg:hidden absolute inset-0 z-20 bg-white/40 backdrop-blur-[6px] flex flex-col items-center justify-center p-6 text-center border-t border-white/50">
+          <div className="h-12 w-12 bg-accent/10 text-accent rounded-full flex items-center justify-center mb-4 shadow-sm border border-accent/20">
+            <Lock className="h-5 w-5" />
+          </div>
+          <h3 className="font-bold text-lg text-primary mb-2">Visualize on Mobile</h3>
+          <p className="text-sm text-muted-foreground mb-5 max-w-[280px]">
+            Upgrade to Premium to drag-and-drop your applications in the visual pipeline flow right from your phone.
           </p>
+          <Link href="/dashboard/profile" className="inline-flex items-center justify-center h-10 px-5 rounded-lg bg-accent text-white font-medium text-sm transition-colors hover:bg-accent/90 shadow-sm">
+            <Sparkles className="h-4 w-4 mr-2" /> Upgrade to Premium
+          </Link>
         </div>
-        <div className="text-xs font-semibold text-muted-foreground bg-muted/50 px-3 py-1 rounded-full">
-          {totalJobs} total job{totalJobs !== 1 ? "s" : ""}
-        </div>
-      </div>
+      )}
 
-      {/* ── SVG Sankey ─────────────────────────────────────────────────────── */}
+      <div className={cn("p-6", !isPremium && "max-lg:opacity-30 max-lg:pointer-events-none")}>
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="text-base font-bold text-primary">Application Flow</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Click a stage to view jobs · Drag jobs between stages to update status
+            </p>
+          </div>
+          <div className="text-xs font-semibold text-muted-foreground bg-muted/50 px-3 py-1 rounded-full">
+            {totalJobs} total job{totalJobs !== 1 ? "s" : ""}
+          </div>
+        </div>
+
+        {/* ── SVG Sankey ─────────────────────────────────────────────────────── */}
       <div className="relative overflow-x-auto">
         <svg
           ref={svgRef}
@@ -364,6 +389,7 @@ export function SankeyDiagram() {
           )}
         </div>
       )}
+      </div>
     </div>
   );
 }
