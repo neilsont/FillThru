@@ -213,7 +213,7 @@ export function SankeyDiagram() {
   if (isLoading || totalJobs === 0) return null;
 
   return (
-    <div className="hidden lg:block mt-6 rounded-2xl border border-border/50 bg-white p-6 shadow-sm">
+    <div className="mt-6 rounded-2xl border border-border/50 bg-white p-6 shadow-sm">
       <div className="flex items-center justify-between mb-4">
         <div>
           <h3 className="text-base font-bold text-primary">Application Flow</h3>
