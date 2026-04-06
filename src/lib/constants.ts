@@ -1,7 +1,6 @@
 import type { JobStatus } from "@/types/database";
 
 export const KANBAN_COLUMNS: { id: JobStatus; label: string; color: string }[] = [
-  { id: "discovered", label: "Discovered", color: "bg-slate-100" },
   { id: "in_progress", label: "In Progress", color: "bg-blue-100" },
   { id: "applied", label: "Applied", color: "bg-indigo-100" },
   { id: "interviewing", label: "Interviewing", color: "bg-violet-100" },

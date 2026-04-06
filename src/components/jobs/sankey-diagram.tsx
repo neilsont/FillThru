@@ -26,16 +26,14 @@ interface FlowLink {
 }
 
 const SANKEY_NODES: SankeyNode[] = [
-  { id: "discovered",   label: "Discovered",   color: "#94a3b8", textColor: "#334155", x: 0, order: 0 },
-  { id: "in_progress",  label: "In Progress",  color: "#3b82f6", textColor: "#1e3a5f", x: 1, order: 0 },
-  { id: "applied",      label: "Applied",      color: "#6366f1", textColor: "#312e81", x: 2, order: 0 },
-  { id: "interviewing", label: "Interviewing", color: "#8b5cf6", textColor: "#4c1d95", x: 3, order: 0 },
-  { id: "offer",        label: "Offer",        color: "#22c55e", textColor: "#14532d", x: 4, order: 0 },
-  { id: "rejected",     label: "Rejected",     color: "#ef4444", textColor: "#7f1d1d", x: 4, order: 1 },
+  { id: "in_progress",  label: "In Progress",  color: "#3b82f6", textColor: "#1e3a5f", x: 0, order: 0 },
+  { id: "applied",      label: "Applied",      color: "#6366f1", textColor: "#312e81", x: 1, order: 0 },
+  { id: "interviewing", label: "Interviewing", color: "#8b5cf6", textColor: "#4c1d95", x: 2, order: 0 },
+  { id: "offer",        label: "Offer",        color: "#22c55e", textColor: "#14532d", x: 3, order: 0 },
+  { id: "rejected",     label: "Rejected",     color: "#ef4444", textColor: "#7f1d1d", x: 3, order: 1 },
 ];
 
 const FLOW_LINKS: FlowLink[] = [
-  { source: "discovered",   target: "in_progress" },
   { source: "in_progress",  target: "applied" },
   { source: "applied",      target: "interviewing" },
   { source: "applied",      target: "rejected" },
@@ -52,7 +50,7 @@ const NODE_WIDTH = 32;
 const NODE_MIN_HEIGHT = 44;
 const NODE_PADDING = 30;
 const DRAW_WIDTH = SVG_WIDTH - SVG_PADDING_X * 2; // drawable area
-const COLUMN_GAP = DRAW_WIDTH / 4; // 5 columns (0-4)
+const COLUMN_GAP = DRAW_WIDTH / 3; // 4 columns (0-3)
 
 /* ── Helpers ──────────────────────────────────────────────────────────────── */
 

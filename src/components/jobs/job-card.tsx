@@ -10,7 +10,6 @@ import { cn } from "@/lib/utils";
 import type { Job } from "@/types/database";
 
 const STATUS_BORDER_COLORS: Record<string, string> = {
-  discovered: "border-l-slate-400",
   in_progress: "border-l-blue-500",
   applied: "border-l-indigo-500",
   interviewing: "border-l-violet-500",

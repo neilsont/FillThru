@@ -1,6 +1,6 @@
 export type SupplementalSource = "manual" | "ai_suggested" | "imported";
 export type JobSource = "manual" | "indeed" | "linkedin" | "other";
-export type JobStatus = "discovered" | "in_progress" | "applied" | "interviewing" | "rejected" | "offer";
+export type JobStatus = "in_progress" | "applied" | "interviewing" | "rejected" | "offer";
 export type ApplicationStatus = "draft" | "ready" | "submitted" | "withdrawn";
 
 export interface ResumeData {

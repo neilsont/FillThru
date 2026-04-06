@@ -47,12 +47,6 @@ export async function POST(request: NextRequest) {
 
     if (existingJob) {
       jobId = existingJob.id;
-      // Update job status to in_progress if it was just 'discovered'
-      await supabase
-        .from("jobs")
-        .update({ status: "in_progress", updated_at: new Date().toISOString() })
-        .eq("id", jobId)
-        .eq("status", "discovered");
     } else {
       const { data: newJob, error: jobError } = await supabase
         .from("jobs")

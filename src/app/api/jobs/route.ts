@@ -52,7 +52,7 @@ export async function POST(request: Request) {
         description: body.description || null,
         url: body.url || null,
         source: body.source || "manual",
-        status: "discovered",
+        status: "in_progress",
         match_score: body.match_score || null,
         logo_url: body.logo_url || null,
       })
