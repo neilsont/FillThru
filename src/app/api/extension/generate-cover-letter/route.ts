@@ -1,7 +1,10 @@
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
-import { NextRequest, NextResponse } from "next/server";
-import { generateCoverLetter } from "@/lib/ai";
+import { NextRequest, NextResponse, after } from "next/server";
+import { recordGeneration } from "@/lib/generations";
+import { generateCoverLetter, getModelFallbackChain } from "@/lib/ai";
+import { DEFAULT_MODEL, type AIModel } from "@/lib/ai/types";
 import { ParsedResume } from "@/types/resume";
+import { isPaidModel, userIsPremium } from "@/lib/subscription";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -22,7 +25,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: CORS_HEADERS });
     }
 
-    const { jobTitle, companyName, jobDescription } = await request.json();
+    const { jobTitle, companyName, jobDescription, model = DEFAULT_MODEL } = await request.json();
     if (!jobTitle || !companyName || !jobDescription) {
       return NextResponse.json({ error: "Missing job details" }, { status: 400, headers: CORS_HEADERS });
     }
@@ -37,6 +40,13 @@ export async function POST(request: NextRequest) {
     const { data: { user }, error } = await supabase.auth.getUser(token);
     if (error || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: CORS_HEADERS });
+    }
+
+    const requestedModel = model as AIModel;
+    const isPremium = await userIsPremium(supabase, user.id, user.email);
+
+    if (isPaidModel(requestedModel) && !isPremium) {
+      return NextResponse.json({ error: "premium_required" }, { status: 402, headers: CORS_HEADERS });
     }
 
     // Fetch resume data
@@ -62,19 +72,36 @@ export async function POST(request: NextRequest) {
     });
 
     // Generate cover letter
+    const startedAt = Date.now();
     const coverLetter = await generateCoverLetter(
       jobDescription,
       companyName,
       jobTitle,
       resumeRow.parsed_json as ParsedResume,
-      supplemental
+      supplemental,
+      requestedModel,
+      getModelFallbackChain(requestedModel, isPremium)
+    );
+
+    // Persist to MongoDB after the response is sent so it never adds latency.
+    after(() =>
+      recordGeneration({
+        userId: user.id,
+        kind: "cover_letter",
+        source: "extension",
+        model: requestedModel,
+        job: { title: jobTitle, company: companyName },
+        durationMs: Date.now() - startedAt,
+        output: { coverLetter },
+      })
     );
 
     return NextResponse.json({ coverLetter }, { headers: CORS_HEADERS });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Internal server error";
     console.error("Generate cover letter error:", error);
     return NextResponse.json(
-      { error: error?.message || "Internal server error" },
+      { error: message },
       { status: 500, headers: CORS_HEADERS }
     );
   }

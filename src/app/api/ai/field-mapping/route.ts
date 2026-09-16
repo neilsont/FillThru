@@ -1,10 +1,11 @@
 import { createClient } from "@/lib/supabase/server";
-import { mapApplicationFields } from "@/lib/ai";
+import { getModelFallbackChain, mapApplicationFields } from "@/lib/ai";
 import type { ParsedResume } from "@/types/resume";
 import type { AIModel } from "@/lib/ai/types";
 import { DEFAULT_MODEL } from "@/lib/ai/types";
 import { isPaidModel, userIsPremium } from "@/lib/subscription";
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
+import { recordGeneration } from "@/lib/generations";
 
 export async function POST(request: Request) {
   try {
@@ -19,7 +20,10 @@ export async function POST(request: Request) {
 
     const { job_id, model = DEFAULT_MODEL } = await request.json();
 
-    if (isPaidModel(model as AIModel) && !(await userIsPremium(supabase, user.id))) {
+    const requestedModel = model as AIModel;
+    const isPremium = await userIsPremium(supabase, user.id, user.email);
+
+    if (isPaidModel(requestedModel) && !isPremium) {
       return NextResponse.json({ error: "premium_required" }, { status: 402 });
     }
 
@@ -57,11 +61,13 @@ export async function POST(request: Request) {
       supplemental[row.question_key] = row.answer;
     });
 
+    const startedAt = Date.now();
     const mappings = await mapApplicationFields(
       job.description || "",
       resumeRow.parsed_json as unknown as ParsedResume,
       supplemental,
-      model as AIModel
+      requestedModel,
+      getModelFallbackChain(requestedModel, isPremium)
     );
 
     // Flag low-confidence fields
@@ -87,6 +93,19 @@ export async function POST(request: Request) {
       })
       .eq("job_id", job_id)
       .eq("user_id", user.id);
+
+    // Persist to MongoDB after the response is sent so it never adds latency.
+    after(() =>
+      recordGeneration({
+        userId: user.id,
+        kind: "field_mapping",
+        source: "web",
+        model: requestedModel,
+        job: { id: job.id, title: job.title, company: job.company, url: job.url ?? undefined },
+        durationMs: Date.now() - startedAt,
+        output: { mappings, lowConfidenceCount: lowConfidence.length },
+      })
+    );
 
     return NextResponse.json({ mappings });
   } catch (error) {

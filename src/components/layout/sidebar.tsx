@@ -9,6 +9,7 @@ import {
   User,
   FileText,
   MessageCircleQuestion,
+  History,
   ChevronLeft,
   ChevronRight,
   Rocket,
@@ -20,6 +21,7 @@ const navItems = [
   { href: "/profile", label: "Profile", icon: User },
   { href: "/applications", label: "Applications", icon: FileText },
   { href: "/questions", label: "Questions", icon: MessageCircleQuestion },
+  { href: "/history", label: "History", icon: History },
 ];
 
 function NavLinks({ collapsed, onNavigate }: { collapsed?: boolean; onNavigate?: () => void }) {
