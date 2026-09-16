@@ -1,9 +1,15 @@
 // CareerLaunch Browser Extension — Popup
 // Connects to CareerLaunch website and coordinates auto-fill
 
-const BASE_URL = "https://career-launch-taylorneilson-projects.vercel.app"; // production URL
+const DEFAULT_BASE_URL = "https://career-launch-taylorneilson-projects.vercel.app";
+const BASE_URL_CANDIDATES = [
+  DEFAULT_BASE_URL,
+  "http://localhost:3000",
+  "http://127.0.0.1:3000",
+];
 const SUPABASE_URL = "https://jxricnvgdaktresxfwqr.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_iyRuOLc1Nwwk_fb0frFVIQ_gDSBadVw";
+let activeBaseUrl = DEFAULT_BASE_URL;
 
 // ── DOM refs ────────────────────────────────────────────────────────────────
 const viewLogin = document.getElementById("view-login");
@@ -26,10 +32,100 @@ const btnSaveFill    = document.getElementById("btn-save-fill");
 const btnClose       = document.getElementById("btn-close");
 const alertsList    = document.getElementById("alerts-list");
 const alertCount    = document.getElementById("alert-count");
+const btnOpenAlerts = document.getElementById("btn-open-alerts");
 const coverLetterSection = document.getElementById("cover-letter-section");
 const btnMagicLetter     = document.getElementById("btn-magic-letter");
+const aiAssistantSection = document.getElementById("ai-assistant-section");
+const questionsSummary   = document.getElementById("questions-summary");
+const questionActions    = document.getElementById("question-actions");
+const customQuestionsDiv = document.getElementById("custom-questions");
+const btnAnswerAll       = document.getElementById("btn-answer-all");
+const btnFillAnswered    = document.getElementById("btn-fill-answered");
+const btnCopyAll         = document.getElementById("btn-copy-all");
 
-openDashboard.href = BASE_URL + "/dashboard";
+function setActiveBaseUrl(baseUrl) {
+  activeBaseUrl = baseUrl;
+  openDashboard.href = `${baseUrl}/dashboard`;
+}
+
+function getBaseUrlCandidates() {
+  return [activeBaseUrl, ...BASE_URL_CANDIDATES.filter((baseUrl) => baseUrl !== activeBaseUrl)];
+}
+
+async function readResponsePayload(response) {
+  const text = await response.text();
+  if (!text) return { data: null, text: "" };
+
+  try {
+    return { data: JSON.parse(text), text };
+  } catch {
+    return { data: null, text };
+  }
+}
+
+function buildResponseError(response, payload, fallbackMessage) {
+  const isHtml = payload.text?.includes("<!DOCTYPE") || payload.text?.includes("<html");
+  const message =
+    payload.data?.error ||
+    payload.data?.message ||
+    (!isHtml && payload.text) ||
+    fallbackMessage;
+
+  const error = new Error(message || fallbackMessage);
+  error.status = response.status;
+  return error;
+}
+
+async function fetchCareerLaunch(path, init = {}, options = {}) {
+  const candidates = options.baseUrls || getBaseUrlCandidates();
+  let lastError = null;
+  let lastResponse = null;
+  let lastPayload = null;
+
+  for (const baseUrl of candidates) {
+    try {
+      const controller = new AbortController();
+      const timeoutMs = options.timeoutMs ?? (baseUrl.includes("localhost") || baseUrl.includes("127.0.0.1") ? 1500 : 5000);
+      const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+      const response = await fetch(`${baseUrl}${path}`, {
+        ...init,
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeout);
+
+      if (response.ok) {
+        setActiveBaseUrl(baseUrl);
+        return { response, payload: await readResponsePayload(response), baseUrl };
+      }
+
+      const payload = await readResponsePayload(response);
+      lastResponse = response;
+      lastPayload = payload;
+
+      if (response.status === 404 || response.status === 405 || response.status >= 500) {
+        continue;
+      }
+
+      throw buildResponseError(response, payload, options.fallbackMessage || "Request failed");
+    } catch (error) {
+      if (error?.name === "AbortError") {
+        lastError = new Error(options.timeoutMessage || "The request timed out. Please try again.");
+        continue;
+      }
+      lastError = error;
+    }
+  }
+
+  if (lastResponse) {
+    throw buildResponseError(lastResponse, lastPayload || { data: null, text: "" }, options.fallbackMessage || "Request failed");
+  }
+
+  throw lastError || new Error(options.fallbackMessage || "Could not reach CareerLaunch");
+}
+
+setActiveBaseUrl(DEFAULT_BASE_URL);
 
 // ── Message Relay (Fix for Injected Context) ─────────────────────────────────
 
@@ -59,7 +155,7 @@ async function discoverJob(token) {
         await saveJobToCareerLaunch(token, info);
       }
     }
-  } catch (err) {
+  } catch {
     // Silent fail for discovery
   }
 }
@@ -157,11 +253,10 @@ async function clearAuth() {
 // ── Profile fetch ─────────────────────────────────────────────────────────────
 
 async function fetchProfile(token) {
-  const res = await fetch(`${BASE_URL}/api/extension/profile`, {
+  const { payload } = await fetchCareerLaunch("/api/extension/profile", {
     headers: { "Authorization": `Bearer ${token}` },
-  });
-  if (!res.ok) throw new Error("Could not fetch profile");
-  return res.json();
+  }, { fallbackMessage: "Could not fetch profile" });
+  return payload.data;
 }
 
 // ── Render helpers ─────────────────────────────────────────────────────────────
@@ -192,6 +287,15 @@ function showFillResult(type, msg) {
   fillResult.textContent = msg;
 }
 
+function openQuestionsPage() {
+  const url = `${activeBaseUrl}/questions`;
+  if (chrome?.tabs?.create) {
+    chrome.tabs.create({ url });
+  } else {
+    window.open(url, "_blank");
+  }
+}
+
 async function updatePageInfo() {
   try {
     const info = await getTabInfo();
@@ -206,6 +310,50 @@ async function updatePageInfo() {
   }
 }
 
+async function copyTextToClipboard(text) {
+  const value = String(text || "");
+  if (!value.trim()) {
+    throw new Error("Nothing to copy yet.");
+  }
+
+  if (navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(value);
+      return;
+    } catch (error) {
+      console.warn("Clipboard API failed, falling back to execCommand:", error);
+    }
+  }
+
+  const textArea = document.createElement("textarea");
+  textArea.value = value;
+  textArea.setAttribute("readonly", "true");
+  textArea.style.position = "fixed";
+  textArea.style.opacity = "0";
+  textArea.style.pointerEvents = "none";
+  textArea.style.top = "-1000px";
+
+  document.body.appendChild(textArea);
+  textArea.focus();
+  textArea.select();
+
+  try {
+    const copied = document.execCommand("copy");
+    if (!copied) {
+      throw new Error("Copy command was rejected.");
+    }
+  } finally {
+    textArea.remove();
+  }
+}
+
+function setTemporaryButtonLabel(button, temporaryText, originalText, duration = 1500) {
+  button.textContent = temporaryText;
+  setTimeout(() => {
+    button.textContent = originalText;
+  }, duration);
+}
+
 // ── Missing supplemental info ─────────────────────────────────────────────────
 
 let _saveFillHandler = null;
@@ -214,19 +362,47 @@ function showMissingInfo(skippedFields, token) {
   if (!skippedFields?.length) { missingSection.style.display = "none"; return; }
 
   missingSection.style.display = "block";
-  missingFields.innerHTML = skippedFields.map((f) => {
-    if (f.options?.length > 0) {
-      const opts = f.options.map((o) => `<option value="${o}">${o}</option>`).join("");
-      return `<div class="missing-field-row">
-        <label class="missing-field-label" for="miss-${f.fieldName}">${f.pageLabel}</label>
-        <select class="missing-field-input" id="miss-${f.fieldName}">
-          <option value="">Select…</option>${opts}
-        </select></div>`;
+  missingFields.replaceChildren();
+
+  for (const field of skippedFields) {
+    const row = document.createElement("div");
+    row.className = "missing-field-row";
+
+    const label = document.createElement("label");
+    label.className = "missing-field-label";
+    label.htmlFor = `miss-${field.fieldName}`;
+    label.textContent = field.pageLabel;
+    row.appendChild(label);
+
+    if (field.options?.length > 0) {
+      const select = document.createElement("select");
+      select.className = "missing-field-input";
+      select.id = `miss-${field.fieldName}`;
+
+      const emptyOption = document.createElement("option");
+      emptyOption.value = "";
+      emptyOption.textContent = "Select…";
+      select.appendChild(emptyOption);
+
+      for (const option of field.options) {
+        const optionElement = document.createElement("option");
+        optionElement.value = option;
+        optionElement.textContent = option;
+        select.appendChild(optionElement);
+      }
+
+      row.appendChild(select);
+    } else {
+      const input = document.createElement("input");
+      input.type = "text";
+      input.className = "missing-field-input";
+      input.id = `miss-${field.fieldName}`;
+      input.placeholder = "Your answer…";
+      row.appendChild(input);
     }
-    return `<div class="missing-field-row">
-      <label class="missing-field-label" for="miss-${f.fieldName}">${f.pageLabel}</label>
-      <input type="text" class="missing-field-input" id="miss-${f.fieldName}" placeholder="Your answer…" /></div>`;
-  }).join("");
+
+    missingFields.appendChild(row);
+  }
 
   if (_saveFillHandler) btnSaveFill.removeEventListener("click", _saveFillHandler);
   _saveFillHandler = async () => {
@@ -237,11 +413,11 @@ function showMissingInfo(skippedFields, token) {
         const el = document.getElementById(`miss-${f.fieldName}`);
         const val = el?.value?.trim();
         if (!val) continue;
-        await fetch(`${BASE_URL}/api/extension/supplemental`, {
+        await fetchCareerLaunch("/api/extension/supplemental", {
           method: "POST",
           headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
           body: JSON.stringify({ question_key: f.fieldName, question_label: f.pageLabel, answer: val }),
-        });
+        }, { fallbackMessage: "Could not save supplemental answer" });
       }
       // Re-fetch profile and re-fill the page
       const updated = await fetchProfile(token);
@@ -326,13 +502,17 @@ async function runAutofill() {
 
     // Show missing supplemental fields so user can answer from the popup
     showMissingInfo(response?.skippedFields ?? [], access_token);
+    
+    // AI Copilot Questions Scan
+    await scanAndLoadQuestions(access_token);
 
     if (response?.alerts?.length > 0) {
       for (const alert of response.alerts) {
-        await sendAlert(access_token, alert);
+        await storeLocalAlert(alert);
       }
-      loadAlerts();
     }
+
+    await loadAlerts();
   } catch (err) {
     autofillBadge.textContent = "Error";
     autofillBadge.className = "badge badge-error";
@@ -344,53 +524,223 @@ async function runAutofill() {
 
 async function saveJobToCareerLaunch(token, jobInfo, filledFields = null) {
   try {
-    const res = await fetch(`${BASE_URL}/api/extension/save-job`, {
+    const { payload } = await fetchCareerLaunch("/api/extension/save-job", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${token}`,
       },
       body: JSON.stringify({ ...jobInfo, filled_fields: filledFields }),
-    });
-    if (res.ok) return res.json(); // { job, created }
+    }, { fallbackMessage: "Could not save job" });
+    return payload.data;
   } catch {
     // best-effort — don't block the user if this fails
   }
   return null;
 }
 
-async function sendAlert(token, alert) {
+async function storeLocalAlert(alert) {
   try {
-    await fetch(`${BASE_URL}/api/extension/alert`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${token}`,
-      },
-      body: JSON.stringify(alert),
-    });
+    await chrome.runtime.sendMessage({ type: "CL_STORE_ALERT", alert });
   } catch {
     // best-effort
   }
 }
 
+function renderEmptyAlertsState() {
+  alertsList.replaceChildren();
+  const hint = document.createElement("p");
+  hint.className = "hint";
+  hint.textContent = "No pending alerts";
+  alertsList.appendChild(hint);
+  alertCount.style.display = "none";
+  btnOpenAlerts.style.display = "none";
+  btnOpenAlerts.textContent = "Open Pending Questions";
+}
+
+function updateAlertControls(count) {
+  if (count > 0) {
+    alertCount.style.display = "inline";
+    alertCount.textContent = count > 9 ? "9+" : String(count);
+    btnOpenAlerts.style.display = "flex";
+    btnOpenAlerts.textContent = `Open Pending Questions (${count})`;
+    return;
+  }
+
+  alertCount.style.display = "none";
+  btnOpenAlerts.style.display = "none";
+  btnOpenAlerts.textContent = "Open Pending Questions";
+}
+
+async function savePendingAlertAnswer(alert, answer, button) {
+  const { access_token: token } = await getStoredAuth();
+  if (!token) return;
+
+  const trimmedAnswer = String(answer || "").trim();
+  if (!trimmedAnswer) {
+    showFillResult("warn", "Please enter an answer before saving.");
+    return;
+  }
+
+  button.disabled = true;
+  const originalLabel = button.textContent;
+  button.textContent = "Saving...";
+
+  try {
+    await fetchCareerLaunch("/api/extension/alert", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        id: alert.id,
+        ids: alert.ids || [],
+        answer: trimmedAnswer,
+        field_key: alert.field_key,
+        question_text: alert.question_text,
+        saveToSupplemental: true,
+      }),
+    }, { fallbackMessage: "Could not save this pending question", timeoutMs: 15000 });
+
+    showFillResult("success", "Saved to supplemental info. Fill Application will be able to reuse it.");
+    await loadAlerts();
+  } catch (error) {
+    showFillResult("error", error.message || "Could not save this pending question.");
+  } finally {
+    button.disabled = false;
+    button.textContent = originalLabel;
+  }
+}
+
+function renderManualAlertQueue(alerts, count, actionableCount = alerts.length) {
+  alertsList.replaceChildren();
+  updateAlertControls(count);
+
+  if (count === 0) {
+    renderEmptyAlertsState();
+    return;
+  }
+
+  if (!alerts.length) {
+    const hint = document.createElement("p");
+    hint.className = "hint";
+    hint.textContent =
+      count === 1
+        ? "1 pending question needs attention on the website."
+        : `${count} pending questions need attention on the website.`;
+    alertsList.appendChild(hint);
+    return;
+  }
+
+  const alert = alerts[0];
+  const card = document.createElement("div");
+  card.className = "alert-card";
+
+  const heading = document.createElement("div");
+  heading.className = "alert-company";
+  heading.textContent = alert.job?.company
+    ? `${alert.job.title} at ${alert.job.company}`
+    : "Pending Question";
+  card.appendChild(heading);
+
+  const detail = document.createElement("div");
+  detail.className = "alert-detail";
+  detail.textContent = alert.question_text ?? "Manual action required";
+  card.appendChild(detail);
+
+  const meta = document.createElement("p");
+  meta.className = "alert-meta";
+  if (count > 1) {
+    meta.textContent = actionableCount > 1
+      ? `Showing the next pending question. ${count - 1} more remain.`
+      : `${count} pending items remain. Open the website to clear the rest at once.`;
+  } else {
+    meta.textContent = alert.actionable
+      ? "Save an answer here to add it to your supplemental info."
+      : "This item requires manual action on the website.";
+  }
+  card.appendChild(meta);
+
+  const actions = document.createElement("div");
+  actions.className = "alert-actions";
+
+  if (alert.actionable) {
+    const input = document.createElement("textarea");
+    input.className = "alert-response-input";
+    input.rows = 3;
+    input.placeholder = "Type your answer here...";
+    input.value = alert.existing_answer || "";
+    card.appendChild(input);
+
+    const saveButton = document.createElement("button");
+    saveButton.className = "btn btn-primary";
+    saveButton.type = "button";
+    saveButton.textContent = "Save to Supplemental";
+    saveButton.addEventListener("click", async () => {
+      await savePendingAlertAnswer(alert, input.value, saveButton);
+    });
+    actions.appendChild(saveButton);
+  }
+
+  const openButton = document.createElement("button");
+  openButton.className = "btn btn-secondary";
+  openButton.type = "button";
+  openButton.textContent = "Open Website Queue";
+  openButton.addEventListener("click", openQuestionsPage);
+  actions.appendChild(openButton);
+
+  card.appendChild(actions);
+  alertsList.appendChild(card);
+}
+
 // ── Load alerts ───────────────────────────────────────────────────────────────
 
 async function loadAlerts() {
+  const { access_token: token } = await getStoredAuth();
+
+  if (token) {
+    try {
+      const { payload } = await fetchCareerLaunch("/api/extension/alert", {
+        headers: { "Authorization": `Bearer ${token}` },
+      }, { fallbackMessage: "Could not fetch alerts", timeoutMs: 10000 });
+
+      const alerts = payload.data?.alerts || [];
+      const count = payload.data?.count ?? alerts.length;
+      const actionableCount = payload.data?.actionableCount ?? alerts.length;
+      renderManualAlertQueue(alerts, count, actionableCount);
+      return;
+    } catch (error) {
+      console.warn("Falling back to local alerts:", error);
+    }
+  }
+
   const { alerts = [] } = await new Promise((r) => chrome.storage.local.get("alerts", r));
   if (alerts.length === 0) {
-    alertsList.innerHTML = '<p class="hint">No pending alerts</p>';
-    alertCount.style.display = "none";
+    renderEmptyAlertsState();
     return;
   }
-  alertCount.style.display = "inline";
-  alertCount.textContent = alerts.length;
-  alertsList.innerHTML = alerts.map((a) => `
-    <div class="alert-item">
-      <div class="alert-company">${a.company ?? a.job_url ?? "Unknown site"}</div>
-      <div class="alert-detail">${a.blocker_detail ?? "Manual action required"}</div>
-    </div>
-  `).join("");
+  updateAlertControls(alerts.length);
+  alertsList.replaceChildren();
+
+  for (const alert of alerts) {
+    const item = document.createElement("button");
+    item.className = "alert-item";
+    item.type = "button";
+    item.addEventListener("click", openQuestionsPage);
+
+    const company = document.createElement("div");
+    company.className = "alert-company";
+    company.textContent = alert.company ?? alert.job_url ?? "Unknown site";
+
+    const detail = document.createElement("div");
+    detail.className = "alert-detail";
+    detail.textContent = alert.blocker_detail ?? "Manual action required";
+
+    item.appendChild(company);
+    item.appendChild(detail);
+    alertsList.appendChild(item);
+  }
 }
 
 // ── Main init ─────────────────────────────────────────────────────────────────
@@ -430,10 +780,25 @@ function showMainView(profileData, email) {
 
 // ── Event listeners ────────────────────────────────────────────────────────────
 
-btnClose.addEventListener("click", () => {
-  // Tell background script to toggle the overlay in our current tab
-  chrome.runtime.sendMessage({ type: "CL_TOGGLE_SELF" });
+btnClose.addEventListener("click", async (event) => {
+  event.preventDefault();
+  event.stopPropagation();
+
+  try {
+    const response = await relayToContent({ type: "CL_TOGGLE_OVERLAY" });
+    if (response?.ok) return;
+  } catch (error) {
+    console.warn("Direct close relay failed:", error);
+  }
+
+  try {
+    await chrome.runtime.sendMessage({ type: "CL_TOGGLE_SELF" });
+  } catch (error) {
+    console.error("Close overlay failed:", error);
+  }
 });
+
+btnOpenAlerts?.addEventListener("click", openQuestionsPage);
 
 btnLogin.addEventListener("click", async () => {
   loginError.style.display = "none";
@@ -489,7 +854,7 @@ btnMagicLetter.addEventListener("click", async () => {
     if (!info) throw new Error("Could not extract job info");
 
     // 2. Call API to generate
-    const response = await fetch(`${BASE_URL}/api/extension/generate-cover-letter`, {
+    const { payload } = await fetchCareerLaunch("/api/extension/generate-cover-letter", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -500,14 +865,13 @@ btnMagicLetter.addEventListener("click", async () => {
         companyName: info.company,
         jobDescription: info.description
       })
+    }, {
+      fallbackMessage: "Generation failed",
+      timeoutMs: 60000,
+      timeoutMessage: "Cover letter generation took too long. Please try again.",
     });
 
-    if (!response.ok) {
-      const err = await response.json();
-      throw new Error(err.error || "Generation failed");
-    }
-
-    const { coverLetter } = await response.json();
+    const { coverLetter } = payload.data;
 
     // 3. Fill the field
     const fillRes = await relayToContent({ type: "CL_FILL_COVER_LETTER", text: coverLetter });
@@ -523,3 +887,670 @@ btnMagicLetter.addEventListener("click", async () => {
     btnMagicLetter.disabled = false;
   }
 });
+
+// ── AI Copilot ─────────────────────────────────────────────────────────────
+
+let currentQuestions = [];
+const questionAnswerState = new Map();
+
+function getQuestionState(questionId) {
+  return questionAnswerState.get(questionId) || {};
+}
+
+function setQuestionState(questionId, nextState) {
+  questionAnswerState.set(questionId, { ...getQuestionState(questionId), ...nextState });
+}
+
+function getQuestionTypeLabel(question) {
+  if (question.type === "essay" || question.isCoverLetter) return "Essay";
+  if (question.type === "multi_select") return "Multi";
+  if (question.type === "multiple_choice") return "Select";
+  return "Short";
+}
+
+function getAnsweredQuestions() {
+  return currentQuestions.filter((question) => getQuestionState(question.id).answer);
+}
+
+function syncQuestionActions() {
+  const hasQuestions = currentQuestions.length > 0;
+  const answeredCount = getAnsweredQuestions().length;
+  questionActions.style.display = hasQuestions ? "grid" : "none";
+  btnFillAnswered.disabled = answeredCount === 0;
+  btnCopyAll.disabled = answeredCount === 0;
+}
+
+function renderQuestions() {
+  customQuestionsDiv.replaceChildren();
+  syncQuestionActions();
+
+  for (const question of currentQuestions) {
+    const state = getQuestionState(question.id);
+    const item = document.createElement("div");
+    item.className = "qa-item";
+
+    const head = document.createElement("div");
+    head.className = "qa-head";
+
+    const title = document.createElement("div");
+    title.className = "qa-title";
+    title.textContent = state.rewrittenQuestion || question.rewrittenLabel || question.label;
+    head.appendChild(title);
+
+    const meta = document.createElement("div");
+    meta.className = "qa-meta";
+
+    const typePill = document.createElement("span");
+    typePill.className = "qa-pill";
+    typePill.textContent = getQuestionTypeLabel(question);
+    meta.appendChild(typePill);
+
+    if (question.required) {
+      const requiredPill = document.createElement("span");
+      requiredPill.className = "qa-pill warn";
+      requiredPill.textContent = "Required";
+      meta.appendChild(requiredPill);
+    }
+
+    if (state.confidence) {
+      const confidencePill = document.createElement("span");
+      confidencePill.className = `qa-pill ${state.confidence === "high" ? "ok" : state.confidence === "low" ? "warn" : ""}`;
+      confidencePill.textContent = `${state.confidence} confidence`;
+      meta.appendChild(confidencePill);
+    }
+
+    item.appendChild(head);
+    item.appendChild(meta);
+
+    if (question.helpText) {
+      const help = document.createElement("div");
+      help.className = "qa-help";
+      help.textContent = question.helpText;
+      item.appendChild(help);
+    }
+
+    if (state.error) {
+      const error = document.createElement("div");
+      error.className = "qa-help";
+      error.textContent = state.error;
+      item.appendChild(error);
+    }
+
+    const answerBox = document.createElement("div");
+    answerBox.className = "qa-answer";
+    if (state.answer) {
+      answerBox.style.display = "block";
+      answerBox.textContent = state.answer;
+    }
+    item.appendChild(answerBox);
+
+    const actions = document.createElement("div");
+    actions.className = "qa-actions";
+
+    const answerButton = document.createElement("button");
+    answerButton.className = "btn btn-secondary";
+    answerButton.type = "button";
+    answerButton.textContent = state.loading ? "Thinking..." : state.answer ? "Regenerate" : "Answer";
+    answerButton.disabled = Boolean(state.loading);
+    answerButton.addEventListener("click", async () => {
+      await handleAnswerQuestion(question.id);
+    });
+    actions.appendChild(answerButton);
+
+    const copyButton = document.createElement("button");
+    copyButton.className = "btn btn-secondary";
+    copyButton.type = "button";
+    copyButton.textContent = "Copy";
+    copyButton.disabled = !state.answer;
+    copyButton.addEventListener("click", async () => {
+      if (!state.answer) return;
+      try {
+        await copyTextToClipboard(state.answer);
+        setTemporaryButtonLabel(copyButton, "Copied", "Copy");
+      } catch (error) {
+        showFillResult("error", error.message || "Could not copy that answer.");
+      }
+    });
+    actions.appendChild(copyButton);
+
+    const fillButton = document.createElement("button");
+    fillButton.className = "btn btn-primary";
+    fillButton.type = "button";
+    fillButton.textContent = "Fill Page";
+    fillButton.disabled = !state.answer;
+    fillButton.addEventListener("click", async () => {
+      const result = await relayToContent({
+        type: "CL_FILL_QUESTION",
+        questionId: question.id,
+        text: state.answer,
+      });
+
+      if (!result || result.error) {
+        showFillResult("error", result?.error || "Failed to fill that field on the page.");
+        return;
+      }
+
+      showFillResult("success", `Filled "${state.rewrittenQuestion || question.rewrittenLabel || question.label}".`);
+    });
+    actions.appendChild(fillButton);
+
+    item.appendChild(actions);
+    customQuestionsDiv.appendChild(item);
+  }
+}
+
+function buildQuestionPayload(question) {
+  return {
+    id: question.id,
+    label: question.label,
+    type: question.type,
+    options: question.options || [],
+    helpText: question.helpText || "",
+    placeholder: question.placeholder || "",
+    required: Boolean(question.required),
+    maxLength: question.maxLength,
+    minLength: question.minLength,
+    isCoverLetter: Boolean(question.isCoverLetter),
+  };
+}
+
+async function getJobContext() {
+  const info = await relayToContent({ type: "CL_EXTRACT_JOB" }) || {};
+  return {
+    jobTitle: info.title || "",
+    companyName: info.company || "",
+    jobDescription: info.description || "",
+  };
+}
+
+async function requestSingleAnswer(token, question) {
+  const jobContext = await getJobContext();
+  const { payload } = await fetchCareerLaunch("/api/extension/answer-question", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      ...buildQuestionPayload(question),
+      question: question.label,
+      ...jobContext,
+    }),
+  }, {
+    fallbackMessage: "Generation failed",
+    timeoutMs: 60000,
+    timeoutMessage: "Answer generation timed out. Please try again.",
+  });
+
+  return payload.data;
+}
+
+async function requestBatchAnswers(token, questions) {
+  const jobContext = await getJobContext();
+  const { payload } = await fetchCareerLaunch("/api/extension/answer-questions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      questions: questions.map(buildQuestionPayload),
+      ...jobContext,
+    }),
+  }, {
+    fallbackMessage: "Batch generation failed",
+    timeoutMs: 90000,
+    timeoutMessage: "Batch answer generation timed out. Please try again.",
+  });
+
+  return payload.data?.answers || [];
+}
+
+async function scanAndLoadQuestions() {
+  try {
+    const res = await relayToContent({ type: "CL_SCAN_QUESTIONS" });
+    if (!res || !res.questions || res.questions.length === 0) {
+      aiAssistantSection.style.display = "none";
+      currentQuestions = [];
+      questionAnswerState.clear();
+      customQuestionsDiv.replaceChildren();
+      return;
+    }
+
+    currentQuestions = res.questions;
+    questionAnswerState.clear();
+    aiAssistantSection.style.display = "block";
+    questionsSummary.textContent = `Found ${currentQuestions.length} custom application question${currentQuestions.length === 1 ? "" : "s"}. Answer one or fill them all at once.`;
+    renderQuestions();
+  } catch (err) {
+    console.error("Scan questions error:", err);
+    aiAssistantSection.style.display = "none";
+  }
+}
+
+async function handleAnswerQuestion(questionId) {
+  const question = currentQuestions.find((entry) => entry.id === questionId);
+  if (!question) return;
+
+  const { access_token: token } = await getStoredAuth();
+  if (!token) return;
+
+  setQuestionState(questionId, { loading: true, error: "" });
+  renderQuestions();
+
+  try {
+    const result = await requestSingleAnswer(token, question);
+    if (!result?.answer?.trim()) {
+      throw new Error("The AI returned an empty answer for this question.");
+    }
+    setQuestionState(questionId, {
+      loading: false,
+      error: "",
+      answer: result.answer || "",
+      rewrittenQuestion: result.rewrittenQuestion || question.rewrittenLabel || question.label,
+      confidence: result.confidence || "medium",
+    });
+  } catch (err) {
+    console.error("Copilot error:", err);
+    setQuestionState(questionId, {
+      loading: false,
+      error: err.message || "Could not generate an answer for this question.",
+    });
+    showFillResult("error", err.message || "Could not generate an answer.");
+  }
+
+  renderQuestions();
+}
+
+async function fillAnsweredQuestions() {
+  const answeredQuestions = getAnsweredQuestions();
+  if (!answeredQuestions.length) return;
+
+  let filledCount = 0;
+  for (const question of answeredQuestions) {
+    const state = getQuestionState(question.id);
+    const result = await relayToContent({
+      type: "CL_FILL_QUESTION",
+      questionId: question.id,
+      text: state.answer,
+    });
+
+    if (result && !result.error) {
+      filledCount += 1;
+    }
+  }
+
+  if (filledCount > 0) {
+    showFillResult("success", `Filled ${filledCount} AI answer${filledCount === 1 ? "" : "s"} on the page.`);
+  } else {
+    showFillResult("warn", "No AI answers were filled. The page may need manual paste.");
+  }
+}
+
+async function copyAllAnswers() {
+  const answeredQuestions = getAnsweredQuestions();
+  if (!answeredQuestions.length) return;
+
+  const text = answeredQuestions
+    .map((question) => {
+      const state = getQuestionState(question.id);
+      const heading = state.rewrittenQuestion || question.rewrittenLabel || question.label;
+      return `${heading}\n${state.answer}`;
+    })
+    .join("\n\n");
+
+  try {
+    await copyTextToClipboard(text);
+    setTemporaryButtonLabel(btnCopyAll, "Copied All", "Copy All");
+  } catch (error) {
+    showFillResult("error", error.message || "Could not copy the generated answers.");
+  }
+}
+
+btnAnswerAll?.addEventListener("click", async () => {
+  const { access_token: token } = await getStoredAuth();
+  if (!token || !currentQuestions.length) return;
+
+  const unansweredQuestions = currentQuestions.filter((question) => !getQuestionState(question.id).answer);
+  if (!unansweredQuestions.length) {
+    showFillResult("success", "All detected questions already have AI answers.");
+    return;
+  }
+
+  btnAnswerAll.disabled = true;
+  btnAnswerAll.textContent = "Thinking...";
+  unansweredQuestions.forEach((question) => {
+    setQuestionState(question.id, { loading: true, error: "" });
+  });
+  renderQuestions();
+
+  try {
+    let answers = [];
+    try {
+      answers = await requestBatchAnswers(token, unansweredQuestions);
+    } catch (batchError) {
+      console.warn("Batch answer failed, falling back to single requests:", batchError);
+      for (const question of unansweredQuestions) {
+        try {
+          const result = await requestSingleAnswer(token, question);
+          if (!result?.answer?.trim()) {
+            throw new Error("The AI returned an empty answer for this question.");
+          }
+          answers.push({ id: question.id, ...result });
+        } catch (singleError) {
+          answers.push({
+            id: question.id,
+            rewrittenQuestion: question.rewrittenLabel || question.label,
+            answer: "",
+            confidence: "low",
+            error: singleError.message || "Generation failed",
+          });
+        }
+      }
+    }
+
+    let successCount = 0;
+    let failureCount = 0;
+    for (const answer of answers) {
+      const hasAnswer = Boolean(answer.answer && answer.answer.trim());
+      if (hasAnswer) {
+        successCount += 1;
+      } else {
+        failureCount += 1;
+      }
+      setQuestionState(answer.id, {
+        loading: false,
+        error: hasAnswer ? "" : (answer.error || "The AI returned an empty answer."),
+        answer: answer.answer || "",
+        rewrittenQuestion: answer.rewrittenQuestion || currentQuestions.find((question) => question.id === answer.id)?.rewrittenLabel || "",
+        confidence: answer.confidence || "medium",
+      });
+    }
+
+    unansweredQuestions
+      .filter((question) => !answers.some((answer) => answer.id === question.id))
+      .forEach((question) => {
+        failureCount += 1;
+        setQuestionState(question.id, {
+          loading: false,
+          error: "Generation failed",
+        });
+      });
+
+    if (successCount > 0 && failureCount === 0) {
+      showFillResult("success", `Generated ${successCount} answer${successCount === 1 ? "" : "s"}.`);
+    } else if (successCount > 0) {
+      showFillResult("warn", `Generated ${successCount} answer${successCount === 1 ? "" : "s"}, but ${failureCount} question${failureCount === 1 ? "" : "s"} still need attention.`);
+    } else {
+      showFillResult("error", "Could not generate answers for these questions.");
+    }
+  } catch (err) {
+    console.error("Answer all error:", err);
+    unansweredQuestions.forEach((question) => {
+      setQuestionState(question.id, { loading: false, error: err.message || "Could not generate an answer." });
+    });
+    showFillResult("error", err.message || "Could not answer all questions.");
+  } finally {
+    btnAnswerAll.disabled = false;
+    btnAnswerAll.textContent = "Answer All";
+    renderQuestions();
+  }
+});
+
+btnFillAnswered?.addEventListener("click", async () => {
+  await fillAnsweredQuestions();
+});
+
+btnCopyAll?.addEventListener("click", async () => {
+  await copyAllAnswers();
+});
+
+// ── Find Jobs / Autopilot ──────────────────────────────────────────────────────
+
+const fjKeywords       = document.getElementById("fj-keywords");
+const fjLocation       = document.getElementById("fj-location");
+const fjTypeChecks     = () => Array.from(document.querySelectorAll(".fj-type-check"));
+const btnSearchIndeed  = document.getElementById("btn-search-indeed");
+const btnAutoApply     = document.getElementById("btn-auto-apply");
+const autopilotStatus  = document.getElementById("autopilot-status");
+const autopilotLabel   = document.getElementById("autopilot-label");
+const btnAutopilotPause  = document.getElementById("btn-autopilot-pause");
+const btnAutopilotStop   = document.getElementById("btn-autopilot-stop");
+const autopilotPaywall   = document.getElementById("autopilot-paywall");
+const btnUpgrade         = document.getElementById("btn-upgrade");
+const autopilotSupplemental = document.getElementById("autopilot-supplemental");
+const autopilotSuppFields   = document.getElementById("autopilot-supp-fields");
+const btnAutopilotResume    = document.getElementById("btn-autopilot-resume-supp");
+
+// Persist/restore job prefs from storage
+async function loadJobPrefs() {
+  const { jobPrefs } = await new Promise((r) => chrome.storage.local.get("jobPrefs", r));
+  if (!jobPrefs) return;
+  if (jobPrefs.keywords) fjKeywords.value = jobPrefs.keywords;
+  if (jobPrefs.location) fjLocation.value = jobPrefs.location;
+  if (jobPrefs.jobTypes?.length) {
+    fjTypeChecks().forEach((cb) => { cb.checked = jobPrefs.jobTypes.includes(cb.value); });
+  }
+}
+
+async function saveJobPrefs() {
+  const jobPrefs = {
+    keywords: fjKeywords.value.trim(),
+    location: fjLocation.value.trim(),
+    jobTypes: fjTypeChecks().filter((cb) => cb.checked).map((cb) => cb.value),
+  };
+  await new Promise((r) => chrome.storage.local.set({ jobPrefs }, r));
+  return jobPrefs;
+}
+
+// Map our type keys to Indeed's jt= param values
+const INDEED_JT_MAP = { fulltime: "fulltime", parttime: "parttime", contract: "contract", temporary: "temporary", internship: "internship" };
+
+btnSearchIndeed?.addEventListener("click", async () => {
+  const prefs = await saveJobPrefs();
+  const params = new URLSearchParams();
+  if (prefs.keywords) params.set("q", prefs.keywords);
+  if (prefs.location) params.set("l", prefs.location);
+  if (prefs.jobTypes.length === 1) params.set("jt", INDEED_JT_MAP[prefs.jobTypes[0]] || "");
+  chrome.tabs.create({ url: `https://www.indeed.com/jobs?${params}` });
+});
+
+function showAutopilotStatus(label) {
+  autopilotStatus.style.display = "block";
+  autopilotPaywall.style.display = "none";
+  autopilotSupplemental.style.display = "none";
+  autopilotLabel.textContent = label;
+}
+
+function hideAutopilotStatus() {
+  autopilotStatus.style.display = "none";
+}
+
+function showAutopilotPaywall(baseUrl) {
+  hideAutopilotStatus();
+  autopilotPaywall.style.display = "block";
+  btnUpgrade.href = `${baseUrl}/pricing`;
+}
+
+function showAutopilotSupplemental(skippedFields, token) {
+  autopilotSupplemental.style.display = "block";
+  autopilotSuppFields.replaceChildren();
+
+  for (const field of skippedFields) {
+    const row = document.createElement("div");
+    row.className = "missing-field-row";
+    const label = document.createElement("label");
+    label.className = "missing-field-label";
+    label.htmlFor = `ap-miss-${field.fieldName}`;
+    label.textContent = field.pageLabel;
+    row.appendChild(label);
+
+    if (field.options?.length > 0) {
+      const sel = document.createElement("select");
+      sel.className = "missing-field-input";
+      sel.id = `ap-miss-${field.fieldName}`;
+      sel.innerHTML = `<option value="">Select…</option>` +
+        field.options.map((o) => `<option value="${o}">${o}</option>`).join("");
+      row.appendChild(sel);
+    } else {
+      const inp = document.createElement("input");
+      inp.type = "text"; inp.className = "missing-field-input";
+      inp.id = `ap-miss-${field.fieldName}`; inp.placeholder = "Your answer…";
+      row.appendChild(inp);
+    }
+    autopilotSuppFields.appendChild(row);
+  }
+
+  // Wire save & resume
+  btnAutopilotResume.onclick = async () => {
+    btnAutopilotResume.disabled = true;
+    btnAutopilotResume.textContent = "Saving…";
+    try {
+      for (const f of skippedFields) {
+        const el = document.getElementById(`ap-miss-${f.fieldName}`);
+        const val = el?.value?.trim();
+        if (!val) continue;
+        await fetchCareerLaunch("/api/extension/supplemental", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+          body: JSON.stringify({ question_key: f.fieldName, question_label: f.pageLabel, answer: val }),
+        }, { fallbackMessage: "Could not save" });
+      }
+      // Refresh profile and resume autopilot
+      const updated = await fetchProfile(token);
+      autopilotSupplemental.style.display = "none";
+      await chrome.runtime.sendMessage({
+        type: "CL_AUTOPILOT_RESUME",
+        profile: updated.profile,
+        supplemental: updated.supplemental,
+      });
+      showAutopilotStatus("Resuming…");
+    } catch (err) {
+      showFillResult("error", err.message || "Could not save answers");
+    } finally {
+      btnAutopilotResume.disabled = false;
+      btnAutopilotResume.textContent = "Save & Resume";
+    }
+  };
+}
+
+// Poll autopilot state to keep the popup UI in sync
+let autopilotPollInterval = null;
+
+async function pollAutopilotStatus() {
+  const { state } = await chrome.runtime.sendMessage({ type: "CL_AUTOPILOT_STATUS" });
+  if (!state?.active) {
+    clearInterval(autopilotPollInterval);
+    autopilotPollInterval = null;
+    hideAutopilotStatus();
+    btnAutoApply.disabled = false;
+    return;
+  }
+
+  const { access_token: token } = await getStoredAuth();
+  const total = state.jobQueue?.length || 0;
+  const applied = state.appliedCount || 0;
+  const current = state.jobQueue?.[state.currentIndex];
+  const currentLabel = current ? `${current.title} at ${current.company}` : "…";
+
+  if (state.paused && state.pauseReason === "missing_supplemental" && state.pendingSupplemental?.length) {
+    showAutopilotSupplemental(state.pendingSupplemental, token);
+    showAutopilotStatus(`Paused — need info (${applied}/${total} done)`);
+  } else if (state.paused) {
+    showAutopilotStatus(`Paused (${applied}/${total} done)`);
+  } else {
+    showAutopilotStatus(`Applying: ${currentLabel} (${applied}/${total})`);
+  }
+}
+
+btnAutoApply?.addEventListener("click", async () => {
+  const prefs = await saveJobPrefs();
+  const { access_token: token } = await getStoredAuth();
+  if (!token) return;
+
+  btnAutoApply.disabled = true;
+
+  try {
+    // Scan the current Indeed page for matching jobs
+    const scanResult = await relayToContent({ type: "CL_FIND_INDEED_JOBS", jobTypes: prefs.jobTypes });
+
+    if (!scanResult?.jobs?.length) {
+      showFillResult("warn", "No matching jobs found on this page. Search on Indeed first, then click Auto Apply.");
+      btnAutoApply.disabled = false;
+      return;
+    }
+
+    // Check paywall status before starting
+    let paywallCheck;
+    try {
+      const resp = await fetchCareerLaunch("/api/extension/autopilot/complete", {
+        method: "GET",
+        headers: { "Authorization": `Bearer ${token}` },
+      }, { fallbackMessage: "Could not check status" });
+      paywallCheck = resp.payload.data;
+    } catch { paywallCheck = null; }
+
+    if (paywallCheck?.paywalled) {
+      showAutopilotPaywall(activeBaseUrl);
+      btnAutoApply.disabled = false;
+      return;
+    }
+
+    const profileData = await fetchProfile(token);
+    const maxApplications = paywallCheck?.limit ?? 10;
+
+    await chrome.runtime.sendMessage({
+      type: "CL_AUTOPILOT_START",
+      jobQueue: scanResult.jobs,
+      maxApplications,
+      token,
+      baseUrl: activeBaseUrl,
+      profile: profileData.profile,
+      supplemental: profileData.supplemental,
+    });
+
+    showAutopilotStatus(`Starting — ${scanResult.jobs.length} jobs found`);
+
+    // Start polling
+    if (autopilotPollInterval) clearInterval(autopilotPollInterval);
+    autopilotPollInterval = setInterval(pollAutopilotStatus, 3000);
+
+  } catch (err) {
+    showFillResult("error", err.message || "Could not start autopilot");
+    btnAutoApply.disabled = false;
+  }
+});
+
+btnAutopilotPause?.addEventListener("click", async () => {
+  const { state } = await chrome.runtime.sendMessage({ type: "CL_AUTOPILOT_STATUS" });
+  if (state?.paused) {
+    const { access_token: token } = await getStoredAuth();
+    const updated = await fetchProfile(token);
+    await chrome.runtime.sendMessage({ type: "CL_AUTOPILOT_RESUME", profile: updated.profile, supplemental: updated.supplemental });
+    btnAutopilotPause.textContent = "Pause";
+  } else {
+    await chrome.runtime.sendMessage({ type: "CL_AUTOPILOT_PAUSE" });
+    btnAutopilotPause.textContent = "Resume";
+  }
+});
+
+btnAutopilotStop?.addEventListener("click", async () => {
+  await chrome.runtime.sendMessage({ type: "CL_AUTOPILOT_STOP" });
+  clearInterval(autopilotPollInterval);
+  autopilotPollInterval = null;
+  hideAutopilotStatus();
+  btnAutoApply.disabled = false;
+  btnAutopilotPause.textContent = "Pause";
+});
+
+// Load prefs and restore autopilot state on popup open
+(async () => {
+  await loadJobPrefs();
+  const { state } = await chrome.runtime.sendMessage({ type: "CL_AUTOPILOT_STATUS" });
+  if (state?.active) {
+    showAutopilotStatus("Autopilot running…");
+    btnAutoApply.disabled = true;
+    if (autopilotPollInterval) clearInterval(autopilotPollInterval);
+    autopilotPollInterval = setInterval(pollAutopilotStatus, 3000);
+  }
+})();

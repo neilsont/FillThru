@@ -1,41 +1,66 @@
-import { createClient } from "@/lib/supabase/server";
+import { createServerClient } from "@supabase/ssr";
 import { NextResponse } from "next/server";
+import { type CookieOptions } from "@supabase/ssr";
 
 export async function GET(request: Request) {
   try {
     const { searchParams, origin } = new URL(request.url);
     const code = searchParams.get("code");
-    const next = searchParams.get("next") ?? "/dashboard";
 
-    if (code) {
-      const supabase = await createClient();
-      const { error } = await supabase.auth.exchangeCodeForSession(code);
-      
-      const successHtml = `
-      <!DOCTYPE html>
-      <html>
-        <head><meta charset="utf-8"/><title>Redirecting...</title></head>
-        <body>
-          <script>window.location.replace("${origin}${next}");</script>
-        </body>
-      </html>
-      `;
+    // Sanitize `next` — only allow relative paths to prevent open redirect
+    const rawNext = searchParams.get("next") ?? "/dashboard";
+    const next = rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : "/dashboard";
 
-      if (!error) {
-        return new NextResponse(successHtml, { headers: { "Content-Type": "text/html" } });
-      }
-
-      // Retry once for mobile browsers with cookie timing issues
-      await new Promise((r) => setTimeout(r, 500));
-      const { error: retryError } = await supabase.auth.exchangeCodeForSession(code);
-      if (!retryError) {
-        return new NextResponse(successHtml, { headers: { "Content-Type": "text/html" } });
-      }
-
-      console.error("Auth callback exchange error:", retryError);
+    if (!code) {
+      return NextResponse.redirect(`${origin}/login?error=auth_callback_failed`);
     }
 
-    return NextResponse.redirect(`${origin}/login?error=auth_callback_failed`);
+    // Collect all cookies Supabase wants to set so we can attach them
+    // explicitly to the redirect response. This is the only approach that
+    // works reliably across all mobile browsers (iOS Safari, Android Chrome)
+    // because `new NextResponse(html)` does NOT carry cookies from next/headers.
+    const cookiesToSet: Array<{ name: string; value: string; options: CookieOptions }> = [];
+
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() {
+            return request.headers
+              .get("cookie")
+              ?.split(";")
+              .map((c) => {
+                const [name, ...rest] = c.trim().split("=");
+                return { name: name.trim(), value: rest.join("=").trim() };
+              }) ?? [];
+          },
+          setAll(toSet) {
+            for (const cookie of toSet) {
+              cookiesToSet.push(cookie);
+            }
+          },
+        },
+      }
+    );
+
+    const { error } = await supabase.auth.exchangeCodeForSession(code);
+
+    if (error) {
+      console.error("Auth callback exchange error:", error);
+      return NextResponse.redirect(`${origin}/login?error=auth_callback_failed`);
+    }
+
+    // Build a real redirect response and attach every Set-Cookie header
+    // that Supabase produced. This is the only approach guaranteed to work
+    // on mobile browsers where cookie propagation from Route Handlers is
+    // unreliable with bare NextResponse instances.
+    const response = NextResponse.redirect(`${origin}${next}`);
+    for (const { name, value, options } of cookiesToSet) {
+      response.cookies.set(name, value, options);
+    }
+
+    return response;
   } catch (error) {
     console.error("Auth callback error:", error);
     const { origin } = new URL(request.url);

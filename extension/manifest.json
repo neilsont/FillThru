@@ -39,7 +39,8 @@
     "scripting",
     "webNavigation",
     "notifications",
-    "identity"
+    "identity",
+    "clipboardWrite"
   ],
   "host_permissions": [
     "<all_urls>"

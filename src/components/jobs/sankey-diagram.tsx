@@ -4,9 +4,10 @@ import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { useJobs, useUpdateJob } from "@/hooks/use-jobs";
 import { useKanbanStore } from "@/stores/kanban-store";
 import { useToast } from "@/components/ui/toast";
-import { X, GripVertical, ExternalLink, Lock, Sparkles } from "lucide-react";
+import { X, GripVertical, ExternalLink, Lock, Sparkles, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
+import { useSubscription } from "@/hooks/use-subscription";
 import type { Job, JobStatus } from "@/types/database";
 
 /* ── Sankey Node Definitions ─────────────────────────────────────────────── */
@@ -77,17 +78,11 @@ function sankeyPath(
 /* ── Component ────────────────────────────────────────────────────────────── */
 
 export function SankeyDiagram() {
-  const { data: jobs = [], isLoading } = useJobs();
+  const { data: jobs = [], isLoading: jobsLoading } = useJobs();
   const updateJob = useUpdateJob();
-  const [isPremium, setIsPremium] = useState(false);
-
-  useEffect(() => {
-    fetch("/api/stripe/status")
-      .then((r) => r.json())
-      .then((d) => setIsPremium(d.isPremium ?? false))
-      .catch(() => {});
-  }, []);
+  const { isPremium, isLoading: subLoading, upgrading, handleUpgrade } = useSubscription();
   const { toast } = useToast();
+
   const [selectedNode, setSelectedNode] = useState<JobStatus | null>(null);
   const [hoveredNode, setHoveredNode] = useState<JobStatus | null>(null);
   const [dragOverNode, setDragOverNode] = useState<JobStatus | null>(null);
@@ -219,7 +214,7 @@ export function SankeyDiagram() {
     return jobs.filter((j) => j.status === selectedNode);
   }, [jobs, selectedNode]);
 
-  if (isLoading || totalJobs === 0) return null;
+  if (jobsLoading || subLoading || totalJobs === 0) return null;
 
   return (
     <div className="mt-6 rounded-2xl bg-white shadow-sm overflow-hidden relative border border-border/50">
@@ -232,9 +227,18 @@ export function SankeyDiagram() {
           <p className="text-sm text-muted-foreground mb-5 max-w-[280px]">
             Upgrade to Premium to drag-and-drop your applications in the visual pipeline flow right from your phone.
           </p>
-          <Link href="/dashboard/profile" className="inline-flex items-center justify-center h-10 px-5 rounded-lg bg-accent text-white font-medium text-sm transition-colors hover:bg-accent/90 shadow-sm">
-            <Sparkles className="h-4 w-4 mr-2" /> Upgrade to Premium
-          </Link>
+          <button
+            onClick={handleUpgrade}
+            disabled={upgrading}
+            className="inline-flex items-center justify-center h-10 px-5 rounded-lg bg-accent text-white font-medium text-sm transition-colors hover:bg-accent/90 shadow-sm disabled:opacity-70"
+          >
+            {upgrading ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Sparkles className="h-4 w-4 mr-2" />
+            )}
+            Upgrade to Premium
+          </button>
         </div>
       )}
 

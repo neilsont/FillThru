@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { parseResumeText } from "@/lib/ai";
+import { getModelFallbackChain, parseResumeText } from "@/lib/ai";
 import type { AIModel } from "@/lib/ai/types";
 import { DEFAULT_MODEL } from "@/lib/ai/types";
 import { isPaidModel, userIsPremium } from "@/lib/subscription";
@@ -60,7 +60,9 @@ export async function POST(request: Request) {
 
     const model = (formData.get("model") as AIModel | null) ?? DEFAULT_MODEL;
 
-    if (isPaidModel(model) && !(await userIsPremium(supabase, user.id))) {
+    const isPremium = await userIsPremium(supabase, user.id, user.email);
+
+    if (isPaidModel(model) && !isPremium) {
       return NextResponse.json({ error: "premium_required" }, { status: 402 });
     }
 
@@ -106,7 +108,7 @@ export async function POST(request: Request) {
     // Parse with Claude AI
     let parsedJson;
     try {
-      parsedJson = await parseResumeText(rawText, model);
+      parsedJson = await parseResumeText(rawText, model, getModelFallbackChain(model, isPremium));
     } catch (aiError) {
       console.error("AI parsing error:", aiError);
       return NextResponse.json({ error: "Failed to analyze resume with AI. Please try again." }, { status: 500 });

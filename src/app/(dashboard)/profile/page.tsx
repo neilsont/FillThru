@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/shared/page-header";
 import { ResumeSection } from "@/components/profile/resume-section";
 import { SupplementalForm } from "@/components/profile/supplemental-form";
 import { AIModelSelector } from "@/components/profile/ai-model-selector";
+import { AutoApplySettings } from "@/components/profile/auto-apply-settings";
 
 export default function ProfilePage() {
   return (
@@ -24,6 +25,7 @@ export default function ProfilePage() {
         </TabsContent>
         <TabsContent value="settings">
           <AIModelSelector />
+          <AutoApplySettings />
         </TabsContent>
       </Tabs>
     </div>

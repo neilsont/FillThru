@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +12,7 @@ import { Loader2 } from "lucide-react";
 import { OAuthButtons } from "./oauth-buttons";
 
 export function LoginForm() {
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -30,7 +32,8 @@ export function LoginForm() {
         return;
       }
 
-      window.location.href = "/dashboard";
+      router.push("/dashboard");
+      router.refresh();
     } catch {
       setError("Something went wrong");
     } finally {

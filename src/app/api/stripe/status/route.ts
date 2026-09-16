@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
+import { userIsPremium } from "@/lib/subscription";
 
 export async function GET() {
   const supabase = await createClient();
@@ -9,15 +10,7 @@ export async function GET() {
     return NextResponse.json({ isPremium: false });
   }
 
-  const { data } = await supabase
-    .from("user_subscriptions")
-    .select("status, current_period_end")
-    .eq("user_id", user.id)
-    .single();
-
-  const isPremium =
-    data?.status === "active" &&
-    (!data.current_period_end || new Date(data.current_period_end) > new Date());
+  const isPremium = await userIsPremium(supabase, user.id, user.email);
 
   return NextResponse.json({ isPremium });
 }

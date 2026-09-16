@@ -1,7 +1,28 @@
 import type { AIModel } from "./types";
-import { DEFAULT_MODEL } from "./types";
+import { AI_MODELS, DEFAULT_MODEL } from "./types";
 import type { ParsedResume } from "@/types/resume";
 import type { FieldMapping } from "@/types/application";
+
+export type QuestionAnswerType =
+  | "short_answer"
+  | "essay"
+  | "multiple_choice"
+  | "multi_select";
+
+export interface QuestionAnswerContext {
+  helpText?: string;
+  placeholder?: string;
+  required?: boolean;
+  maxLength?: number | null;
+  minLength?: number | null;
+  isCoverLetter?: boolean;
+}
+
+export interface GeneratedQuestionAnswer {
+  rewrittenQuestion: string;
+  answer: string;
+  confidence: "high" | "medium" | "low";
+}
 
 // ─── Shared prompts ────────────────────────────────────────────────────────────
 
@@ -32,13 +53,14 @@ async function openaiCompatChat(
   baseURL: string,
   model: string,
   systemPrompt: string,
-  userPrompt: string
+  userPrompt: string,
+  maxTokens = 1024
 ): Promise<string> {
   const OpenAI = (await import("openai")).default;
   const client = new OpenAI({ apiKey, baseURL });
   const res = await client.chat.completions.create({
     model,
-    max_tokens: 4096,
+    max_tokens: maxTokens,
     messages: [
       { role: "system", content: systemPrompt },
       { role: "user", content: userPrompt },
@@ -47,14 +69,14 @@ async function openaiCompatChat(
   return res.choices[0]?.message?.content?.trim() ?? "";
 }
 
-async function anthropicChat(systemPrompt: string, userPrompt: string): Promise<string> {
+async function anthropicChat(systemPrompt: string, userPrompt: string, maxTokens = 1024): Promise<string> {
   const Anthropic = (await import("@anthropic-ai/sdk")).default;
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY is not set");
   const client = new Anthropic({ apiKey });
   const res = await client.messages.create({
     model: "claude-haiku-4-5-20251001",
-    max_tokens: 4096,
+    max_tokens: maxTokens,
     system: systemPrompt,
     messages: [{ role: "user", content: userPrompt }],
   });
@@ -63,17 +85,17 @@ async function anthropicChat(systemPrompt: string, userPrompt: string): Promise<
   return block.text.trim();
 }
 
-async function chat(model: AIModel, systemPrompt: string, userPrompt: string): Promise<string> {
+async function chat(model: AIModel, systemPrompt: string, userPrompt: string, maxTokens = 1024): Promise<string> {
   switch (model) {
     case "groq/llama-3.3-70b-versatile": {
       const key = process.env.GROQ_AI_API_KEY;
       if (!key) throw new Error("GROQ_AI_API_KEY is not set");
-      return openaiCompatChat(key, "https://api.groq.com/openai/v1", "llama-3.3-70b-versatile", systemPrompt, userPrompt);
+      return openaiCompatChat(key, "https://api.groq.com/openai/v1", "llama-3.3-70b-versatile", systemPrompt, userPrompt, maxTokens);
     }
     case "openrouter/qwen3.6-plus": {
       const key = process.env.OPEN_ROUTER_API_KEY;
       if (!key) throw new Error("OPEN_ROUTER_API_KEY is not set");
-      return openaiCompatChat(key, "https://openrouter.ai/api/v1", "qwen/qwen3.6-plus:free", systemPrompt, userPrompt);
+      return openaiCompatChat(key, "https://openrouter.ai/api/v1", "qwen/qwen3.6-plus:free", systemPrompt, userPrompt, maxTokens);
     }
     case "gemini-2.0-flash": {
       const { GoogleGenerativeAI } = await import("@google/generative-ai");
@@ -87,10 +109,10 @@ async function chat(model: AIModel, systemPrompt: string, userPrompt: string): P
     case "gpt-4o-mini": {
       const key = process.env.OPENAI_API_KEY;
       if (!key) throw new Error("OPENAI_API_KEY is not set");
-      return openaiCompatChat(key, "https://api.openai.com/v1", "gpt-4o-mini", systemPrompt, userPrompt);
+      return openaiCompatChat(key, "https://api.openai.com/v1", "gpt-4o-mini", systemPrompt, userPrompt, maxTokens);
     }
     case "claude-haiku-4-5-20251001":
-      return anthropicChat(systemPrompt, userPrompt);
+      return anthropicChat(systemPrompt, userPrompt, maxTokens);
     default:
       throw new Error(`Unknown model: ${model}`);
   }
@@ -100,10 +122,60 @@ function stripCodeFences(text: string): string {
   return text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
 }
 
+function uniqueModels(models: AIModel[]): AIModel[] {
+  return Array.from(new Set(models));
+}
+
+export function getModelFallbackChain(
+  preferredModel: AIModel,
+  includePaidModels = false
+): AIModel[] {
+  const fallbackPool = AI_MODELS
+    .filter((config) => includePaidModels || config.free)
+    .map((config) => config.id);
+
+  return uniqueModels([preferredModel, ...fallbackPool]);
+}
+
+async function chatWithFallback(
+  model: AIModel,
+  systemPrompt: string,
+  userPrompt: string,
+  fallbackModels: AIModel[] = [],
+  maxTokens = 1024
+): Promise<string> {
+  const candidates = uniqueModels([model, ...fallbackModels]);
+  let lastError: unknown = null;
+
+  for (const candidate of candidates) {
+    try {
+      return await chat(candidate, systemPrompt, userPrompt, maxTokens);
+    } catch (error) {
+      lastError = error;
+      console.error(`AI request failed for model ${candidate}:`, error);
+    }
+  }
+
+  if (lastError instanceof Error) {
+    throw lastError;
+  }
+
+  throw new Error("No AI models succeeded");
+}
+
 // ─── Public API ────────────────────────────────────────────────────────────────
 
-export async function parseResumeText(rawText: string, model: AIModel = DEFAULT_MODEL): Promise<ParsedResume> {
-  const text = await chat(model, RESUME_SYSTEM, `Parse the following resume text into the required JSON structure:\n\n${rawText}`);
+export async function parseResumeText(
+  rawText: string,
+  model: AIModel = DEFAULT_MODEL,
+  fallbackModels: AIModel[] = []
+): Promise<ParsedResume> {
+  const text = await chatWithFallback(
+    model,
+    RESUME_SYSTEM,
+    `Parse the following resume text into the required JSON structure:\n\n${rawText}`,
+    fallbackModels
+  );
   return JSON.parse(stripCodeFences(text)) as ParsedResume;
 }
 
@@ -113,12 +185,14 @@ export async function generateCoverLetter(
   jobTitle: string,
   resume: ParsedResume,
   supplemental: Record<string, string>,
-  model: AIModel = DEFAULT_MODEL
+  model: AIModel = DEFAULT_MODEL,
+  fallbackModels: AIModel[] = []
 ): Promise<string> {
-  return chat(
+  return chatWithFallback(
     model,
     COVER_LETTER_SYSTEM,
-    `Write a cover letter for the following job application.\n\nJOB TITLE: ${jobTitle}\nCOMPANY: ${companyName}\n\nJOB DESCRIPTION:\n${jobDescription}\n\nCANDIDATE RESUME DATA:\n${JSON.stringify(resume, null, 2)}\n\nADDITIONAL CANDIDATE INFO:\n${JSON.stringify(supplemental, null, 2)}`
+    `Write a cover letter for the following job application.\n\nJOB TITLE: ${jobTitle}\nCOMPANY: ${companyName}\n\nJOB DESCRIPTION:\n${jobDescription}\n\nCANDIDATE RESUME DATA:\n${JSON.stringify(resume, null, 2)}\n\nADDITIONAL CANDIDATE INFO:\n${JSON.stringify(supplemental, null, 2)}`,
+    fallbackModels
   );
 }
 
@@ -126,14 +200,213 @@ export async function mapApplicationFields(
   jobDescription: string,
   resume: ParsedResume,
   supplemental: Record<string, string>,
-  model: AIModel = DEFAULT_MODEL
+  model: AIModel = DEFAULT_MODEL,
+  fallbackModels: AIModel[] = []
 ): Promise<FieldMapping[]> {
-  const text = await chat(
+  const text = await chatWithFallback(
     model,
     FIELD_MAPPER_SYSTEM,
-    `JOB DESCRIPTION:\n${jobDescription}\n\nCANDIDATE RESUME:\n${JSON.stringify(resume, null, 2)}\n\nSUPPLEMENTAL ANSWERS:\n${JSON.stringify(supplemental, null, 2)}`
+    `JOB DESCRIPTION:\n${jobDescription}\n\nCANDIDATE RESUME:\n${JSON.stringify(resume, null, 2)}\n\nSUPPLEMENTAL ANSWERS:\n${JSON.stringify(supplemental, null, 2)}`,
+    fallbackModels
   );
   const jsonStr = text.match(/```(?:json)?\s*([\s\S]*?)```/)?.[1] ?? text;
   const parsed = JSON.parse(stripCodeFences(jsonStr));
   return parsed.mappings as FieldMapping[];
+}
+
+const CUSTOM_ANSWER_SYSTEM = `You are an expert AI Career Copilot. You are helping a user fill out a specific job application question.
+Use the user's resume and supplemental data to provide the best possible answer to the question.
+If the question is multiple choice or a dropdown, return ONLY the exact choice text that applies best.
+If the question is an essay or short answer, write a professional, concise response that highlights the user's strengths.
+Do not include any prefix like "Here is the answer:". Just return the exact text to enter into the field.
+
+APPLICATION STRATEGY — always act in the candidate's best interest:
+- For yes/no or favorable/unfavorable questions (e.g. "Are you willing to relocate?", "Are you authorized to work?"), choose the answer that helps the application unless the candidate has a clear, hard disqualifier.
+- For skill or experience questions where the skill is adjacent to the candidate's background, answer positively and confidently.
+- Never fabricate hard credentials (specific active licenses, specific degrees not mentioned).
+- When in doubt, lean positive. You represent the candidate.`;
+
+const STRUCTURED_CUSTOM_ANSWER_SYSTEM = `You are an expert AI Career Copilot helping a user complete a job application.
+
+Return ONLY valid JSON matching this exact schema:
+{
+  "rewrittenQuestion": string,
+  "answer": string,
+  "confidence": "high" | "medium" | "low"
+}
+
+Rules:
+- "rewrittenQuestion" should be a cleaner, shorter version of the page prompt for display in an extension UI.
+- "answer" must be the exact text the user should paste or enter into the field.
+- For single-select or multiple-choice questions, use the exact choice text from the provided options.
+- For multi-select questions, return the best matching choices separated by commas.
+- For essays or cover letters, write a professional response grounded in the candidate resume.
+- Do not wrap the JSON in markdown fences.
+
+APPLICATION STRATEGY — always act in the candidate's best interest:
+- For yes/no or favorable/unfavorable questions (e.g. "Are you willing to relocate?", "Are you authorized to work?"), choose the answer that helps the application unless the candidate has a clear, hard disqualifier on their resume.
+- For skill/experience questions where the skill is plausible given adjacent background, answer yes/positively and set confidence to "medium".
+- Never fabricate hard credentials (specific active licenses, certifications, or degrees not on the resume).
+- When in doubt, lean positive and set confidence to "medium". You represent the candidate's best interests.`;
+
+function buildQuestionPrompt(
+  question: string,
+  type: QuestionAnswerType,
+  options: string[],
+  jobTitle: string,
+  companyName: string,
+  jobDescription: string,
+  resume: ParsedResume,
+  supplemental: Record<string, string>,
+  context: QuestionAnswerContext = {}
+): string {
+  const promptParts = [
+    `JOB TITLE: ${jobTitle}`,
+    `COMPANY: ${companyName}`,
+    jobDescription ? `JOB DESCRIPTION:\n${jobDescription.slice(0, 1500)}` : "",
+    `CANDIDATE RESUME:\n${JSON.stringify(resume, null, 2)}`,
+    `SUPPLEMENTAL DATA:\n${JSON.stringify(supplemental, null, 2)}`,
+    "---",
+    `QUESTION TO ANSWER: "${question}"`,
+    `FIELD TYPE: ${type}`,
+    context.helpText ? `HELP TEXT: ${context.helpText}` : "",
+    context.placeholder ? `PLACEHOLDER: ${context.placeholder}` : "",
+    typeof context.required === "boolean" ? `REQUIRED: ${context.required ? "yes" : "no"}` : "",
+    typeof context.maxLength === "number" ? `MAX LENGTH: ${context.maxLength}` : "",
+    typeof context.minLength === "number" ? `MIN LENGTH: ${context.minLength}` : "",
+    context.isCoverLetter ? "FIELD PURPOSE: cover letter or long-form application response" : "",
+    options && options.length > 0
+      ? `AVAILABLE OPTIONS (Use exact option text when applicable):\n- ${options.join("\n- ")}`
+      : "",
+  ];
+
+  return `${promptParts.filter(Boolean).join("\n\n")}\n\nGenerate the exact text to fill into this field:`;
+}
+
+function extractJsonObject(text: string): string {
+  const cleaned = stripCodeFences(text);
+  const match = cleaned.match(/\{[\s\S]*\}/);
+  return match ? match[0] : cleaned;
+}
+
+function normalizeGeneratedQuestionAnswer(
+  parsed: Partial<GeneratedQuestionAnswer> | null | undefined,
+  originalQuestion: string
+): GeneratedQuestionAnswer {
+  const rewrittenQuestion = (parsed?.rewrittenQuestion || originalQuestion).trim();
+  const answer = (parsed?.answer || "").trim();
+  const confidence = parsed?.confidence === "high" || parsed?.confidence === "low"
+    ? parsed.confidence
+    : "medium";
+
+  return {
+    rewrittenQuestion,
+    answer,
+    confidence,
+  };
+}
+
+function getMaxTokensForType(type: QuestionAnswerType, isCoverLetter: boolean): number {
+  if (isCoverLetter || type === "essay") return 1024;
+  if (type === "short_answer") return 512;
+  return 256; // multiple_choice, multi_select
+}
+
+export async function generateCustomAnswer(
+  question: string,
+  type: QuestionAnswerType,
+  options: string[],
+  jobTitle: string,
+  companyName: string,
+  jobDescription: string,
+  resume: ParsedResume,
+  supplemental: Record<string, string>,
+  context: QuestionAnswerContext = {},
+  model: AIModel = DEFAULT_MODEL,
+  fallbackModels: AIModel[] = []
+): Promise<string> {
+  const maxTokens = getMaxTokensForType(type, Boolean(context.isCoverLetter));
+  return chatWithFallback(
+    model,
+    CUSTOM_ANSWER_SYSTEM,
+    buildQuestionPrompt(
+      question,
+      type,
+      options,
+      jobTitle,
+      companyName,
+      jobDescription,
+      resume,
+      supplemental,
+      context
+    ),
+    fallbackModels,
+    maxTokens
+  );
+}
+
+export async function generateStructuredQuestionAnswer(
+  question: string,
+  type: QuestionAnswerType,
+  options: string[],
+  jobTitle: string,
+  companyName: string,
+  jobDescription: string,
+  resume: ParsedResume,
+  supplemental: Record<string, string>,
+  context: QuestionAnswerContext = {},
+  model: AIModel = DEFAULT_MODEL,
+  fallbackModels: AIModel[] = []
+): Promise<GeneratedQuestionAnswer> {
+  const maxTokens = getMaxTokensForType(type, Boolean(context.isCoverLetter));
+  try {
+    const response = await chatWithFallback(
+      model,
+      STRUCTURED_CUSTOM_ANSWER_SYSTEM,
+      buildQuestionPrompt(
+        question,
+        type,
+        options,
+        jobTitle,
+        companyName,
+        jobDescription,
+        resume,
+        supplemental,
+        context
+      ),
+      fallbackModels,
+      maxTokens
+    );
+
+    const parsed = JSON.parse(extractJsonObject(response)) as Partial<GeneratedQuestionAnswer>;
+    const normalized = normalizeGeneratedQuestionAnswer(parsed, question);
+    if (!normalized.answer) {
+      throw new Error("Structured answer was empty");
+    }
+    return normalized;
+  } catch {
+    const answer = await generateCustomAnswer(
+      question,
+      type,
+      options,
+      jobTitle,
+      companyName,
+      jobDescription,
+      resume,
+      supplemental,
+      context,
+      model,
+      fallbackModels
+    );
+
+    if (!answer.trim()) {
+      throw new Error("AI returned an empty answer");
+    }
+
+    return {
+      rewrittenQuestion: question.trim(),
+      answer: answer.trim(),
+      confidence: "medium",
+    };
+  }
 }

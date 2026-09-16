@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Bot, CheckCircle2, Lock, Sparkles } from "lucide-react";
 import { useToast } from "@/components/ui/toast";
+import { useSubscription } from "@/hooks/use-subscription";
 
 function ProviderIcon({ provider, className }: { provider: string; className?: string }) {
   if (provider === "google") {
@@ -51,33 +52,7 @@ function ProviderIcon({ provider, className }: { provider: string; className?: s
 
 export function AIModelSelector() {
   const { selectedModel, setModel } = useAIStore();
-  const [isPremium, setIsPremium] = useState(false);
-  const [upgrading, setUpgrading] = useState(false);
-  const { toast } = useToast();
-
-  useEffect(() => {
-    fetch("/api/stripe/status")
-      .then((r) => r.json())
-      .then((d) => setIsPremium(d.isPremium ?? false))
-      .catch(() => {});
-  }, []);
-
-  async function handleUpgrade() {
-    setUpgrading(true);
-    try {
-      const res = await fetch("/api/stripe/checkout", { method: "POST" });
-      const data = await res.json();
-      if (data.url) {
-        window.location.href = data.url;
-      } else if (data.error) {
-        toast({ title: "Checkout Error", description: data.error, variant: "destructive" });
-      }
-    } catch (err) {
-      toast({ title: "Error", description: "Failed to connect to checkout.", variant: "destructive" });
-    } finally {
-      setUpgrading(false);
-    }
-  }
+  const { isPremium, upgrading, handleUpgrade } = useSubscription();
 
   return (
     <Card className="mt-4 border-border/60">

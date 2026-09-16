@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Methods": "POST, PATCH, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type, Authorization",
 };
 
@@ -105,6 +105,43 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ job: { id: jobId }, created: !existingJob }, { headers: CORS_HEADERS });
   } catch (error) {
     console.error("Extension save-job error:", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500, headers: CORS_HEADERS });
+  }
+}
+
+// PATCH — update application status (e.g. mark as "applied" after autopilot completes)
+export async function PATCH(request: NextRequest) {
+  try {
+    const authHeader = request.headers.get("Authorization");
+    const token = authHeader?.replace("Bearer ", "").trim();
+    if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: CORS_HEADERS });
+
+    const supabase = createSupabaseClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      { global: { headers: { Authorization: `Bearer ${token}` } } }
+    );
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    if (authError || !user) return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: CORS_HEADERS });
+
+    const { url, status } = await request.json();
+    if (!url || !status) return NextResponse.json({ error: "url and status are required" }, { status: 400, headers: CORS_HEADERS });
+
+    const { data: job } = await supabase.from("jobs").select("id").eq("user_id", user.id).eq("url", url).maybeSingle();
+    if (!job) return NextResponse.json({ error: "Job not found" }, { status: 404, headers: CORS_HEADERS });
+
+    await supabase
+      .from("applications")
+      .update({ status, updated_at: new Date().toISOString() })
+      .eq("user_id", user.id)
+      .eq("job_id", job.id);
+
+    await supabase.from("jobs").update({ status }).eq("id", job.id).eq("user_id", user.id);
+
+    return NextResponse.json({ ok: true }, { headers: CORS_HEADERS });
+  } catch (error) {
+    console.error("Extension save-job PATCH error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500, headers: CORS_HEADERS });
   }
 }

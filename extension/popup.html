@@ -80,6 +80,54 @@
         <div id="fill-result" class="fill-result" style="display:none"></div>
       </div>
 
+      <!-- Find Jobs + Autopilot -->
+      <div id="find-jobs-section">
+        <div class="divider"></div>
+        <div class="section">
+          <div class="section-header">
+            <div class="section-title">Find Jobs</div>
+            <div class="badge badge-ai">✨ Auto</div>
+          </div>
+          <div class="find-jobs-fields">
+            <input id="fj-keywords" class="fj-input" type="text" placeholder="Job title, keywords…" autocomplete="off"/>
+            <input id="fj-location" class="fj-input" type="text" placeholder="City, state or Remote" autocomplete="off"/>
+          </div>
+          <div class="fj-types">
+            <label class="fj-type-label"><input type="checkbox" class="fj-type-check" value="fulltime" checked/> Full-time</label>
+            <label class="fj-type-label"><input type="checkbox" class="fj-type-check" value="parttime"/> Part-time</label>
+            <label class="fj-type-label"><input type="checkbox" class="fj-type-check" value="contract"/> Contract</label>
+            <label class="fj-type-label"><input type="checkbox" class="fj-type-check" value="temporary"/> Temporary</label>
+            <label class="fj-type-label"><input type="checkbox" class="fj-type-check" value="internship"/> Internship</label>
+          </div>
+          <div class="fj-actions">
+            <button id="btn-search-indeed" class="btn btn-secondary" type="button">Search on Indeed</button>
+            <button id="btn-auto-apply" class="btn btn-ai" type="button">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              Auto Apply
+            </button>
+          </div>
+          <!-- Autopilot status (shown when active) -->
+          <div id="autopilot-status" style="display:none">
+            <div id="autopilot-label" class="autopilot-label">Starting…</div>
+            <div class="fj-actions">
+              <button id="btn-autopilot-pause" class="btn btn-secondary" type="button">Pause</button>
+              <button id="btn-autopilot-stop" class="btn btn-secondary" type="button">Stop</button>
+            </div>
+          </div>
+          <!-- Paywall notice -->
+          <div id="autopilot-paywall" class="paywall-notice" style="display:none">
+            <p>You've used your <strong>10 free auto-applications</strong>. Upgrade to keep going.</p>
+            <a id="btn-upgrade" href="#" target="_blank" class="btn btn-ai" style="display:block;text-align:center;text-decoration:none;">Upgrade Now</a>
+          </div>
+          <!-- Missing supplemental pause -->
+          <div id="autopilot-supplemental" style="display:none">
+            <p class="hint" style="margin-bottom:6px">Autopilot needs a few answers to continue:</p>
+            <div id="autopilot-supp-fields"></div>
+            <button id="btn-autopilot-resume-supp" class="btn btn-primary" type="button" style="margin-top:8px">Save &amp; Resume</button>
+          </div>
+        </div>
+      </div>
+
       <!-- Magic Cover Letter (Shown if a cover letter field is detected) -->
       <div id="cover-letter-section" style="display:none">
         <div class="divider"></div>
@@ -93,6 +141,27 @@
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14l-5-4.87 6.91-1.01L12 2z"/></svg>
             Write with AI
           </button>
+        </div>
+      </div>
+
+      <!-- AI Assistant Copilot -->
+      <div id="ai-assistant-section" style="display:none">
+        <div class="divider"></div>
+        <div class="section">
+          <div class="section-header">
+            <div class="section-title">AI Application Copilot</div>
+            <div class="badge badge-ai">✨ AI</div>
+          </div>
+          <p id="questions-summary" class="hint">We found custom questions. Use AI to answer them based on your resume.</p>
+          <div id="question-actions" class="question-actions" style="display:none">
+            <button id="btn-answer-all" class="btn btn-ai">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14l-5-4.87 6.91-1.01L12 2z"/></svg>
+              Answer All
+            </button>
+            <button id="btn-fill-answered" class="btn btn-primary" type="button">Fill Answered</button>
+            <button id="btn-copy-all" class="btn btn-secondary" type="button">Copy All</button>
+          </div>
+          <div id="custom-questions" class="custom-questions"></div>
         </div>
       </div>
 
@@ -121,6 +190,9 @@
         <div id="alerts-list" class="alerts-list">
           <p class="hint">No pending alerts</p>
         </div>
+        <button id="btn-open-alerts" class="btn btn-secondary" type="button" style="display:none; margin-top:10px;">
+          Open Pending Questions
+        </button>
       </div>
 
     </div>
