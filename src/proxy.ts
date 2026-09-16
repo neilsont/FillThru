@@ -7,6 +7,14 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    /*
+     * Match all request paths except:
+     * - _next/static, _next/image (Next.js internals)
+     * - favicon.ico, static assets
+     * - /api/auth/callback (handles its own Supabase session — running
+     *   updateSession here would call getUser() before cookies are set)
+     * - /api/cron (machine-to-machine, authenticated by CRON_SECRET)
+     */
+    "/((?!_next/static|_next/image|favicon.ico|api/auth/callback|api/cron|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };
