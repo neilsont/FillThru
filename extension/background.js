@@ -506,6 +506,12 @@ chrome.tabs.onRemoved.addListener(async (tabId) => {
   } catch { /* session storage unavailable */ }
 });
 
+// Chats and launcher state live in storage.session; make sure the panel
+// iframe (and content scripts) can read it regardless of context rules.
+try {
+  chrome.storage.session.setAccessLevel({ accessLevel: "TRUSTED_AND_UNTRUSTED_CONTEXTS" }).catch(() => {});
+} catch { /* older Chrome */ }
+
 // ── Init ─────────────────────────────────────────────────────────────────
 
 updateBadgeCount();

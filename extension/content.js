@@ -1088,6 +1088,12 @@
 
   function syncLauncherReference() {
     const roots = getOverlayRoots();
+    // A root we don't own is left over from a previous copy of this script
+    // (the extension was reloaded while the page stayed open). Replace it.
+    if (roots.length && !launcher) {
+      roots.forEach((root) => root.remove());
+      return null;
+    }
     if (roots.length > 1) roots.slice(1).forEach((root) => root.remove());
     if (!roots[0]) launcher = null;
     return launcher;
@@ -1143,6 +1149,7 @@
   }
 
   function injectLauncher() {
+    getOverlayRoots().forEach((root) => root.remove());
     const host = document.createElement("div");
     host.id = OVERLAY_ROOT_ID;
     Object.assign(host.style, {
@@ -1267,6 +1274,16 @@
     launcher = null;
     reportLauncherState();
   }
+
+  // The panel talks to us directly for close/hide, so it works even when the
+  // extension's messaging is unavailable (e.g. right after an extension reload).
+  window.addEventListener("message", (event) => {
+    if (!launcher || event.source !== launcher.frame.contentWindow) return;
+    const data = event.data;
+    if (!data || data.source !== "fillthru") return;
+    if (data.type === "close") closeStep();
+    else if (data.type === "dismiss") removeOverlay();
+  });
 
   // Page loaded in a tab where Fillthru was showing? Bring it back, chat and all.
   (async () => {

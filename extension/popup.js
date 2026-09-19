@@ -42,6 +42,7 @@ const askAttach = $("ask-attach");
 const resumeFile = $("resume-file");
 const composerFiles = $("composer-files");
 const moveHere = $("move-here");
+const menuMove = $("menu-move");
 $("menu-version").textContent = `Fillthru v${chrome.runtime?.getManifest?.().version ?? "dev"}`;
 const btnMoveHere = $("btn-move-here");
 const btnMoveDismiss = $("btn-move-dismiss");
@@ -471,11 +472,18 @@ function persistChat() {
   }, 150);
 }
 
-function replayChat(snapshot) {
-  askThread.replaceChildren();
-  threadLog.length = 0;
-  chatHistory.length = 0;
-  chatAttachments.length = 0;
+function replayChat(snapshot, { append = false } = {}) {
+  if (!append) {
+    askThread.replaceChildren();
+    threadLog.length = 0;
+    chatHistory.length = 0;
+    chatAttachments.length = 0;
+  } else if (threadLog.length) {
+    const divider = document.createElement("div");
+    divider.className = "thread-divider";
+    divider.textContent = "Moved from another tab";
+    askThread.appendChild(divider);
+  }
   for (const e of snapshot.log || []) {
     if (e.kind === "user") {
       const file = e.file ? { name: e.file.name, size: e.file.size, type: e.file.type } : null;
@@ -492,32 +500,58 @@ function replayChat(snapshot) {
   scrollToBottom();
 }
 
+let movable = null; // { recent, snapshot } — a chat on another tab that can be moved here
+
+async function moveConversationHere() {
+  if (!movable) return;
+  const { recent, snapshot } = movable;
+  moveHere.hidden = true;
+  menuMove.hidden = true;
+  closeMenu();
+  replayChat(snapshot, { append: threadLog.length > 0 });
+  await chrome.storage.session.remove(`chat:${recent.tabId}`).catch(() => {});
+  movable = null;
+  persistChat();
+  askInput.focus();
+}
+
+async function findMovableChat(tabId) {
+  const { chat_recent: recent } = await chrome.storage.session.get("chat_recent");
+  if (!recent || recent.tabId === tabId || Date.now() - recent.at > 86_400_000) return null;
+  const { [`chat:${recent.tabId}`]: snapshot } = await chrome.storage.session.get(`chat:${recent.tabId}`);
+  return snapshot?.log?.length ? { recent, snapshot } : null;
+}
+
 async function restoreChat() {
   if (!chrome.storage?.session) return;
   const tabId = await getTabId();
   if (tabId == null) return;
-  const { [`chat:${tabId}`]: own, chat_recent: recent } = await chrome.storage.session.get([`chat:${tabId}`, "chat_recent"]);
-  if (own?.log?.length) {
-    replayChat(own);
-    return;
-  }
-  // Nothing here — offer the most recent chat from another tab (within a day).
-  if (recent && recent.tabId !== tabId && Date.now() - recent.at < 86_400_000) {
-    const { [`chat:${recent.tabId}`]: theirs } = await chrome.storage.session.get(`chat:${recent.tabId}`);
-    if (!theirs?.log?.length) return;
+  const { [`chat:${tabId}`]: own } = await chrome.storage.session.get(`chat:${tabId}`);
+  if (own?.log?.length) replayChat(own);
+
+  // A recent chat on another tab: always reachable from ⋯, and offered as a
+  // banner when this tab has nothing yet.
+  movable = await findMovableChat(tabId);
+  menuMove.hidden = !movable;
+  if (movable && !own?.log?.length) {
+    const { recent } = movable;
     $("move-here-title").textContent = recent.preview || "Conversation";
     $("move-here-sub").textContent = `${recent.host ? `On ${recent.host} · ` : ""}${recent.count} message${recent.count === 1 ? "" : "s"}`;
     moveHere.hidden = false;
-    btnMoveHere.onclick = async () => {
-      moveHere.hidden = true;
-      replayChat(theirs);
-      await chrome.storage.session.remove(`chat:${recent.tabId}`).catch(() => {});
-      persistChat();
-      askInput.focus();
-    };
-    btnMoveDismiss.onclick = () => { moveHere.hidden = true; };
   }
 }
+
+btnMoveHere.addEventListener("click", moveConversationHere);
+btnMoveDismiss.addEventListener("click", () => { moveHere.hidden = true; });
+menuMove.addEventListener("click", moveConversationHere);
+
+// Re-check for movable chats whenever the menu opens (another tab may have chatted since).
+btnMenu.addEventListener("click", async () => {
+  const tabId = await getTabId();
+  if (tabId == null) return;
+  movable = await findMovableChat(tabId);
+  menuMove.hidden = !movable;
+});
 
 function makeButton(className, label, onClick) {
   const b = document.createElement("button");
@@ -1267,14 +1301,22 @@ menuClear.addEventListener("click", () => {
   persistChat();
 });
 
+// The page hosting this iframe always hears postMessage, even when the
+// extension's own messaging is broken (orphaned script after a reload).
+function tellPage(type) {
+  try { window.parent.postMessage({ source: "fillthru", type }, "*"); } catch { /* no parent */ }
+}
+
 btnHide.addEventListener("click", async () => {
   closeMenu();
+  tellPage("dismiss");
   try { await relayToContent({ type: "CL_DISMISS_ASSISTANT" }); }
   catch (error) { console.warn("Dismiss relay failed:", error); }
 });
 
 btnClose.addEventListener("click", async (event) => {
   event.preventDefault();
+  tellPage("close");
   try {
     const response = await relayToContent({ type: "CL_CLOSE_ASSISTANT" });
     if (response?.ok) return;

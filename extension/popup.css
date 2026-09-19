@@ -285,6 +285,15 @@ body {
   word-break: break-word;
 }
 .bubble.thinking { color: var(--muted); font-style: italic; }
+.thread-divider {
+  align-self: center;
+  margin: 6px 0;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--hover);
+  color: var(--muted);
+  font-size: 11px;
+}
 .answer-text {
   background: #f6f7f9;
   border: 1px solid var(--border);
