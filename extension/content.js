@@ -1037,151 +1037,377 @@
     return { filled, skipped, skippedFields, filled_fields: filledFields, alerts: [...blockerAlerts, ...unknownAlerts], no_fields: inputs.length === 0, jobInfo, coverLetterFound };
   }
 
-  // ── Overlay Injection & State ─────────────────────────────────────────────
+  // ── Assistant launcher (floating button + anchored panel) ─────────────────
+  // Summoned by the toolbar icon or ⌥⇧C. Once on a page it stays until the
+  // user hides it; the panel itself toggles.
   const OVERLAY_ROOT_ID = "cl-overlay-root";
-  let overlayContainer = null;
-  let isDragging = false;
-  let dragOffset = { x: 0, y: 0 };
+  const IS_MAC = /Mac|iPhone|iPad/.test(navigator.platform);
+  const SHORTCUT_LABEL = IS_MAC ? "⌥C" : "Alt+C";
+  const ROCKET_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09"/><path d="M9 12a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.4 22.4 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 .05 5 .05"/></svg>`;
+
+  let launcher = null; // { host, panel, button, open }
+  let lastFocusedField = null;
+
+  // Remember the last editable the user was in so "Insert" knows where to go
+  // (focus moves to our iframe the moment they click into the panel).
+  function isEditable(el) {
+    if (!el || el.id === OVERLAY_ROOT_ID) return false;
+    if (el.isContentEditable) return true;
+    const tag = el.tagName;
+    if (tag === "TEXTAREA") return true;
+    if (tag === "INPUT") {
+      return !/^(button|submit|reset|checkbox|radio|file|hidden|image|range|color)$/i.test(el.type || "text");
+    }
+    return false;
+  }
+
+  document.addEventListener("focusin", (event) => {
+    const target = event.composedPath ? event.composedPath()[0] : event.target;
+    if (isEditable(target)) lastFocusedField = target;
+  }, true);
+
+  function insertAtFocus(text) {
+    const el = lastFocusedField;
+    if (!el || !el.isConnected || !isVisible(el)) {
+      return { ok: false, error: "Click into a text field on the page first." };
+    }
+    if (el.isContentEditable) {
+      el.focus();
+      const ok = document.execCommand("insertText", false, text);
+      if (!ok) el.textContent += text;
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+      return { ok: true };
+    }
+    setElementTextValue(el, text);
+    return { ok: true };
+  }
 
   function getOverlayRoots() {
     return Array.from(document.querySelectorAll(`#${OVERLAY_ROOT_ID}`));
   }
 
-  function syncOverlayReference() {
+  function syncLauncherReference() {
     const roots = getOverlayRoots();
-    overlayContainer = roots[0] || null;
-
-    if (roots.length > 1) {
-      roots.slice(1).forEach((root) => root.remove());
-    }
-
-    return overlayContainer;
+    if (roots.length > 1) roots.slice(1).forEach((root) => root.remove());
+    if (!roots[0]) launcher = null;
+    return launcher;
   }
 
+  // Toolbar icon / ⌥C: summon the launcher if needed and open the panel.
+  // ⌥X (or Esc, or the × in the panel) closes it.
   async function toggleOverlay() {
-    const existingOverlay = syncOverlayReference();
-    if (existingOverlay) {
-      removeOverlay();
-    } else {
-      await injectOverlay();
+    if (!syncLauncherReference()) {
+      injectLauncher();
+      // Next frame so the panel's open transition actually plays on first summon.
+      requestAnimationFrame(() => setPanelOpen(true));
+      return;
+    }
+    if (launcher.open) launcher.frame.focus();
+    else setPanelOpen(true);
+  }
+
+  function setPanelOpen(open) {
+    if (!launcher) return;
+    launcher.open = open;
+    launcher.panel.classList.toggle("open", open);
+    launcher.button.classList.toggle("active", open);
+    launcher.button.setAttribute("aria-expanded", String(open));
+    if (open) {
+      // Lazy-load the panel document on first open.
+      if (!launcher.frame.src) launcher.frame.src = chrome.runtime.getURL("popup.html");
+      launcher.frame.focus();
     }
   }
 
-  async function injectOverlay() {
-    if (syncOverlayReference()) return;
-
-    // Create the host element for Shadow DOM
-    overlayContainer = document.createElement("div");
-    overlayContainer.id = OVERLAY_ROOT_ID;
-    // Basic styles for the container (will be overridden by position storage if exists)
-    Object.assign(overlayContainer.style, {
+  function injectLauncher() {
+    const host = document.createElement("div");
+    host.id = OVERLAY_ROOT_ID;
+    Object.assign(host.style, {
       position: "fixed",
-      top: "20px",
-      right: "20px",
-      width: "360px",
-      height: "560px",
+      inset: "0 0 0 auto",
+      width: "0",
+      height: "0",
       zIndex: "2147483647",
-      backgroundColor: "transparent",
-      borderRadius: "12px",
-      boxShadow: "0 10px 30px rgba(0,0,0,0.25)",
-      overflow: "hidden",
-      transition: "opacity 0.2s ease, transform 0.2s ease",
-      userSelect: "none",
     });
 
-    const shadow = overlayContainer.attachShadow({ mode: "open" });
-
-    // Overlay styles
+    const shadow = host.attachShadow({ mode: "open" });
     const style = document.createElement("style");
     style.textContent = `
       :host { all: initial; }
-      .overlay-frame {
-        width: 100%;
-        height: 100%;
-        border: none;
+      * { box-sizing: border-box; }
+      .btn {
+        position: fixed;
+        right: 24px;
+        bottom: 24px;
+        width: 52px;
+        height: 52px;
+        border-radius: 50%;
+        border: 1px solid rgba(0,0,0,0.08);
         background: #fff;
-        border-radius: 12px;
+        color: #1a3a5c;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.10), 0 10px 28px rgba(0,0,0,0.14);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        padding: 0;
+        transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
       }
-      .drag-handle {
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 56px;
-        height: 48px;
-        cursor: grab;
-        z-index: 10;
-        background: transparent;
+      .btn svg { width: 24px; height: 24px; }
+      .btn:hover { transform: translateY(-1px) scale(1.04); box-shadow: 0 4px 10px rgba(0,0,0,0.12), 0 14px 34px rgba(0,0,0,0.16); }
+      .btn:active { transform: scale(0.97); }
+      .btn.active { background: #1a3a5c; color: #fff; border-color: #1a3a5c; }
+
+      .tip {
+        position: fixed;
+        right: 86px;
+        bottom: 32px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 7px 10px 7px 12px;
+        border-radius: 10px;
+        background: #fff;
+        color: #1f2937;
+        border: 1px solid rgba(0,0,0,0.08);
+        box-shadow: 0 2px 6px rgba(0,0,0,0.08), 0 8px 24px rgba(0,0,0,0.12);
+        font: 500 13px/1.2 -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif;
+        white-space: nowrap;
+        opacity: 0;
+        transform: translateX(4px);
+        pointer-events: none;
+        transition: opacity 0.12s ease, transform 0.12s ease;
       }
-      .drag-handle:active { cursor: grabbing; }
+      .tip kbd {
+        font: 500 11px/1 -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif;
+        color: #6b7280;
+        background: #f3f4f6;
+        border: 1px solid #e5e7eb;
+        border-radius: 5px;
+        padding: 3px 5px;
+      }
+      .btn:hover + .tip { opacity: 1; transform: translateX(0); }
+      .btn.active + .tip { display: none; }
+
+      .panel {
+        position: fixed;
+        right: 24px;
+        bottom: 88px;
+        width: 380px;
+        height: min(620px, calc(100vh - 112px));
+        border-radius: 16px;
+        background: #fff;
+        border: 1px solid rgba(0,0,0,0.08);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08), 0 24px 64px rgba(0,0,0,0.18);
+        overflow: hidden;
+        opacity: 0;
+        transform: translateY(8px) scale(0.98);
+        transform-origin: bottom right;
+        pointer-events: none;
+        transition: opacity 0.16s ease, transform 0.16s ease;
+      }
+      .panel.open { opacity: 1; transform: none; pointer-events: auto; }
+      .panel iframe { width: 100%; height: 100%; border: none; background: #fff; display: block; }
+      @media (max-width: 440px) {
+        .panel { right: 12px; left: 12px; width: auto; }
+      }
     `;
     shadow.appendChild(style);
 
-    // Drag Handle
-    const handle = document.createElement("div");
-    handle.className = "drag-handle";
-    handle.addEventListener("mousedown", startDrag);
-    shadow.appendChild(handle);
+    const button = document.createElement("button");
+    button.className = "btn";
+    button.type = "button";
+    button.setAttribute("aria-label", "Open Applyr assistant");
+    button.innerHTML = ROCKET_SVG;
+    button.addEventListener("click", () => setPanelOpen(!launcher.open));
 
-    // The Iframe
-    const iframe = document.createElement("iframe");
-    iframe.src = chrome.runtime.getURL("popup.html");
-    iframe.className = "overlay-frame";
-    shadow.appendChild(iframe);
+    const tip = document.createElement("div");
+    tip.className = "tip";
+    tip.innerHTML = `<span>Ask Applyr</span><kbd>${SHORTCUT_LABEL}</kbd>`;
 
-    document.body.appendChild(overlayContainer);
-    
-    // Restore position if saved
-    const { overlayPos } = await chrome.storage.local.get("overlayPos");
-    if (overlayPos) {
-      overlayContainer.style.top = overlayPos.top;
-      overlayContainer.style.right = "auto";
-      overlayContainer.style.left = overlayPos.left;
-    }
+    const panel = document.createElement("div");
+    panel.className = "panel";
+    const frame = document.createElement("iframe");
+    frame.setAttribute("title", "Applyr assistant");
+    frame.setAttribute("allow", "clipboard-write");
+    panel.appendChild(frame);
+
+    shadow.append(button, tip, panel);
+    document.documentElement.appendChild(host);
+
+    launcher = { host, button, panel, frame, open: false };
   }
 
   function removeOverlay() {
     getOverlayRoots().forEach((root) => root.remove());
-    overlayContainer = null;
+    launcher = null;
   }
 
-  function startDrag(e) {
-    isDragging = true;
-    const rect = overlayContainer.getBoundingClientRect();
-    dragOffset.x = e.clientX - rect.left;
-    dragOffset.y = e.clientY - rect.top;
-    overlayContainer.style.transition = "none";
-    
-    document.addEventListener("mousemove", onDrag);
-    document.addEventListener("mouseup", stopDrag);
-  }
+  // ── Translate page (Chrome built-in Translator API: on-device, free) ──────
+  // Swaps visible text nodes + placeholders in place and remembers the originals
+  // so "Show original" can restore them. Form values are never touched.
+  let translation = null; // { entries: [{ node, attr?, original }], source, target }
+  const SKIP_TAGS = new Set(["SCRIPT", "STYLE", "NOSCRIPT", "TEXTAREA", "CODE", "PRE", "SVG", "IFRAME", "OPTION"]);
 
-  function onDrag(e) {
-    if (!isDragging) return;
-    const x = e.clientX - dragOffset.x;
-    const y = e.clientY - dragOffset.y;
-    overlayContainer.style.left = `${x}px`;
-    overlayContainer.style.top = `${y}px`;
-    overlayContainer.style.right = "auto";
-  }
-
-  async function stopDrag() {
-    isDragging = false;
-    document.removeEventListener("mousemove", onDrag);
-    document.removeEventListener("mouseup", stopDrag);
-    overlayContainer.style.transition = "opacity 0.2s ease, transform 0.2s ease";
-    
-    // Save position
-    await chrome.storage.local.set({
-      overlayPos: {
-        left: overlayContainer.style.left,
-        top: overlayContainer.style.top
-      }
+  function collectTranslatableText(root = document.body) {
+    const entries = [];
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+      acceptNode(node) {
+        const parent = node.parentElement;
+        if (!parent || SKIP_TAGS.has(parent.tagName) || parent.closest(`#${OVERLAY_ROOT_ID}`)) return NodeFilter.FILTER_REJECT;
+        if (parent.isContentEditable) return NodeFilter.FILTER_REJECT;
+        if (translatedNodes.has(node)) return NodeFilter.FILTER_REJECT;
+        const text = node.nodeValue;
+        if (!text || text.trim().length < 2 || !/[\p{L}]/u.test(text)) return NodeFilter.FILTER_REJECT;
+        if (!isVisible(parent)) return NodeFilter.FILTER_REJECT;
+        return NodeFilter.FILTER_ACCEPT;
+      },
     });
+    while (walker.nextNode()) {
+      entries.push({ node: walker.currentNode, original: walker.currentNode.nodeValue });
+    }
+    const attrTargets = root.querySelectorAll ? root.querySelectorAll("input[placeholder], textarea[placeholder], img[alt], [title]") : [];
+    for (const el of attrTargets) {
+      if (el.closest(`#${OVERLAY_ROOT_ID}`) || !isVisible(el)) continue;
+      for (const attr of ["placeholder", "alt", "title"]) {
+        const value = el.getAttribute(attr);
+        if (value && value.trim().length >= 2 && !translatedAttrs.get(el)?.has(attr)) {
+          entries.push({ node: el, attr, original: value });
+        }
+      }
+    }
+    // Viewport first, so the part the user is looking at swaps within a second.
+    const vh = window.innerHeight;
+    const rank = (e) => {
+      const el = e.attr ? e.node : e.node.parentElement;
+      const top = el?.getBoundingClientRect?.().top ?? 0;
+      return top >= 0 && top < vh ? 0 : top < 0 ? 1 : 2;
+    };
+    return entries.sort((a, b) => rank(a) - rank(b));
   }
+
+  const translatedNodes = new WeakSet();          // text nodes already swapped
+  const translatedAttrs = new WeakMap();          // element → Set of attrs already swapped
+
+  async function detectPageLanguage(entries) {
+    const declared = (document.documentElement.lang || "").split("-")[0].toLowerCase();
+    if (declared) return declared;
+    if (typeof LanguageDetector === "undefined") return "";
+    try {
+      const detector = await LanguageDetector.create();
+      const sample = entries.slice(0, 80).map((e) => e.original.trim()).join(" ").slice(0, 2000);
+      const [best] = await detector.detect(sample);
+      return best?.detectedLanguage || "";
+    } catch {
+      return "";
+    }
+  }
+
+  async function translateEntries(entries) {
+    const { translator } = translation;
+    let index = 0;
+    const worker = async () => {
+      while (translation && index < entries.length) {
+        const entry = entries[index++];
+        const text = entry.original.trim();
+        try {
+          const translated = await translator.translate(text);
+          if (!translated || !translation) continue;
+          const replacement = entry.original.replace(text, translated);
+          if (entry.attr) entry.node.setAttribute(entry.attr, replacement);
+          else entry.node.nodeValue = replacement;
+          if (entry.attr) {
+            if (!translatedAttrs.has(entry.node)) translatedAttrs.set(entry.node, new Set());
+            translatedAttrs.get(entry.node).add(entry.attr);
+          } else {
+            translatedNodes.add(entry.node);
+          }
+          translation.entries.push(entry);
+        } catch { /* leave this node as-is */ }
+      }
+    };
+    await Promise.all(Array.from({ length: 6 }, worker));
+  }
+
+  async function translatePage(target) {
+    if (translation) restoreTranslation();
+    if (typeof Translator === "undefined") return { ok: false, unsupported: true };
+
+    const entries = collectTranslatableText();
+    if (!entries.length) return { ok: false, error: "There's no readable text on this page to translate." };
+
+    const source = await detectPageLanguage(entries);
+    if (!source) return { ok: false, unsupported: true };
+    if (source === target) return { ok: false, error: `This page already appears to be in ${target.toUpperCase()}.` };
+
+    let translator;
+    try {
+      const availability = await Translator.availability({ sourceLanguage: source, targetLanguage: target });
+      if (availability === "unavailable") return { ok: false, unsupported: true };
+      translator = await Translator.create({ sourceLanguage: source, targetLanguage: target });
+    } catch {
+      return { ok: false, unsupported: true };
+    }
+
+    translation = { entries: [], source, target, translator, observer: null };
+
+    // Like Google Translate: keep translating text that appears later (tabs, lazy content, SPA routes).
+    translation.observer = new MutationObserver((mutations) => {
+      if (!translation) return;
+      const fresh = [];
+      for (const m of mutations) {
+        for (const node of m.addedNodes) {
+          if (node.nodeType === Node.ELEMENT_NODE && !node.closest?.(`#${OVERLAY_ROOT_ID}`)) fresh.push(...collectTranslatableText(node));
+          else if (node.nodeType === Node.TEXT_NODE && node.parentElement) fresh.push(...collectTranslatableText(node.parentElement));
+        }
+      }
+      if (fresh.length) translateEntries(fresh);
+    });
+    translation.observer.observe(document.body, { childList: true, subtree: true });
+
+    await translateEntries(entries);
+    return { ok: true, translated: translation?.entries.length ?? 0, source, target };
+  }
+
+  function restoreTranslation() {
+    if (!translation) return { ok: false };
+    translation.observer?.disconnect();
+    for (const entry of translation.entries) {
+      if (entry.attr) translatedAttrs.get(entry.node)?.delete(entry.attr);
+      else translatedNodes.delete(entry.node);
+      if (!entry.node.isConnected) continue;
+      if (entry.attr) entry.node.setAttribute(entry.attr, entry.original);
+      else entry.node.nodeValue = entry.original;
+    }
+    translation = null;
+    return { ok: true };
+  }
+
+  // Keyboard: ⌥C opens, ⌥X / Esc closes. Chrome's commands API only binds
+  // suggested keys at install time (and on Mac can swallow Option+letter), so
+  // the page handles the combo too. Capture phase beats page handlers;
+  // event.code ignores the "ç"/"≈" the OS would type for Option+C / Option+X.
+  window.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && launcher?.open) { setPanelOpen(false); return; }
+    if (!event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+    if (event.code === "KeyC") {
+      event.preventDefault();
+      event.stopPropagation();
+      toggleOverlay();
+    } else if (event.code === "KeyX" && launcher?.open) {
+      event.preventDefault();
+      event.stopPropagation();
+      setPanelOpen(false);
+    }
+  }, true);
 
   // ── Advanced Question Scanner ──────────────────────────────────────────────
   // Scans the page for custom prompts, essays, selects, radios, and checkboxes
   // that are not already handled by the standard autofill field matcher.
+
+  // When true, buildQuestionRecord keeps standard fields (name, email…) and short
+  // labels too, so the assistant sees the whole form rather than just the essays.
+  let scanEverything = false;
 
   function buildQuestionRecord(elements, config = {}) {
     const targets = Array.isArray(elements) ? elements.filter(Boolean) : [elements].filter(Boolean);
@@ -1190,11 +1416,13 @@
 
     const context = getFieldContext(primary);
     const label = rewriteQuestionLabel(config.label || context.label || context.placeholder);
-    if (!label || label.length < 6 || label.length > 500) return null;
+    const minLabel = scanEverything ? 2 : 6;
+    if (!label || label.length < minLabel || label.length > 500) return null;
 
-    const mappedField = matchField(label);
+    const autoComplete = primary.getAttribute("autocomplete");
+    const mappedField = (autoComplete && AUTOCOMPLETE_FIELD_MAP[autoComplete]) || matchField(label);
     const isCoverLetter = Boolean(config.isCoverLetter || mappedField === "cover_letter" || mappedField === "summary");
-    if (mappedField && !isCoverLetter) return null;
+    if (mappedField && !isCoverLetter && !scanEverything) return null;
 
     const currentValue = Array.isArray(config.currentValue)
       ? normalizeText(config.currentValue.join(", "))
@@ -1203,6 +1431,7 @@
     return {
       id: tagQuestionElements(targets, config.prefix || "question"),
       label,
+      mappedField: mappedField || null,
       rewrittenLabel: rewriteQuestionLabel(config.rewrittenLabel || label),
       helpText: normalizeText(config.helpText || context.helpText).slice(0, 220),
       type: config.type || (isEssayLikeField(primary, label) ? "essay" : "short_answer"),
@@ -1367,6 +1596,44 @@
     ]);
   }
 
+  // Every visible fillable field on the page, in a shape the assistant can reason about.
+  function scanFormFields() {
+    scanEverything = true;
+    try {
+      return scanForQuestions().map((q) => ({
+        id: q.id,
+        label: q.label,
+        type: q.type,
+        options: q.options?.length ? q.options : undefined,
+        required: q.required || undefined,
+        currentValue: q.currentValue || undefined,
+        helpText: q.helpText || undefined,
+        placeholder: q.placeholder || undefined,
+        mappedField: q.mappedField,
+      }));
+    } finally {
+      scanEverything = false;
+    }
+  }
+
+  function fillFields(entries) {
+    const results = [];
+    for (const entry of entries || []) {
+      if (!entry?.id) continue;
+      const res = fillQuestionById(entry.id, String(entry.value ?? ""));
+      results.push({ id: entry.id, ...res });
+    }
+    return { filled: results.filter((r) => r.ok && r.changed !== false).length, results };
+  }
+
+  // Track the last non-empty selection: clicking into our panel (an iframe) can
+  // collapse it before the user asks "translate this".
+  let lastSelection = "";
+  document.addEventListener("selectionchange", () => {
+    const text = String(window.getSelection?.() || "").trim();
+    if (text) lastSelection = text.slice(0, 5000);
+  });
+
   // ── Message listener ───────────────────────────────────────────────────────
 
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
@@ -1397,6 +1664,53 @@
 
     if (message.type === "CL_TOGGLE_OVERLAY") {
       toggleOverlay().then(() => sendResponse({ ok: true }));
+      return true;
+    }
+
+    if (message.type === "CL_CLOSE_ASSISTANT") {
+      if (launcher?.open) setPanelOpen(false);
+      sendResponse({ ok: true });
+      return true;
+    }
+
+    if (message.type === "CL_DISMISS_ASSISTANT") {
+      removeOverlay();
+      sendResponse({ ok: true });
+      return true;
+    }
+
+    if (message.type === "CL_INSERT_AT_FOCUS") {
+      sendResponse(insertAtFocus(message.text || ""));
+      return true;
+    }
+
+    if (message.type === "CL_SCAN_FORM") {
+      try {
+        sendResponse({ fields: scanFormFields() });
+      } catch (err) {
+        sendResponse({ fields: [], error: err.message });
+      }
+      return true;
+    }
+
+    if (message.type === "CL_FILL_FIELDS") {
+      sendResponse(fillFields(message.fields));
+      return true;
+    }
+
+    if (message.type === "CL_GET_SELECTION") {
+      const live = String(window.getSelection?.() || "").trim();
+      sendResponse({ selection: live || lastSelection, language: (document.documentElement.lang || "").split("-")[0] });
+      return true;
+    }
+
+    if (message.type === "CL_TRANSLATE_PAGE") {
+      translatePage(message.target || "en").then(sendResponse).catch((err) => sendResponse({ ok: false, error: err.message }));
+      return true;
+    }
+
+    if (message.type === "CL_RESTORE_TRANSLATION") {
+      sendResponse(restoreTranslation());
       return true;
     }
 

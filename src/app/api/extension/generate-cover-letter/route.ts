@@ -4,7 +4,7 @@ import { recordGeneration } from "@/lib/generations";
 import { generateCoverLetter, getModelFallbackChain } from "@/lib/ai";
 import { DEFAULT_MODEL, type AIModel } from "@/lib/ai/types";
 import { ParsedResume } from "@/types/resume";
-import { isPaidModel, userIsPremium } from "@/lib/subscription";
+import { userIsPremium } from "@/lib/subscription";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: CORS_HEADERS });
     }
 
-    const { jobTitle, companyName, jobDescription, model = DEFAULT_MODEL } = await request.json();
+    const { jobTitle, companyName, jobDescription, notes = "", model = DEFAULT_MODEL } = await request.json();
     if (!jobTitle || !companyName || !jobDescription) {
       return NextResponse.json({ error: "Missing job details" }, { status: 400, headers: CORS_HEADERS });
     }
@@ -45,8 +45,9 @@ export async function POST(request: NextRequest) {
     const requestedModel = model as AIModel;
     const isPremium = await userIsPremium(supabase, user.id, user.email);
 
-    if (isPaidModel(requestedModel) && !isPremium) {
-      return NextResponse.json({ error: "premium_required" }, { status: 402, headers: CORS_HEADERS });
+    // Every AI feature requires an active trial or subscription.
+    if (!isPremium) {
+      return NextResponse.json({ error: "subscription_required" }, { status: 402, headers: CORS_HEADERS });
     }
 
     // Fetch resume data
@@ -80,7 +81,8 @@ export async function POST(request: NextRequest) {
       resumeRow.parsed_json as ParsedResume,
       supplemental,
       requestedModel,
-      getModelFallbackChain(requestedModel, isPremium)
+      getModelFallbackChain(requestedModel, isPremium),
+      typeof notes === "string" ? notes.slice(0, 2000) : ""
     );
 
     // Persist to MongoDB after the response is sent so it never adds latency.

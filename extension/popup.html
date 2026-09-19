@@ -3,35 +3,42 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>CareerLaunch</title>
+  <title>Applyr</title>
   <link rel="stylesheet" href="popup.css" />
 </head>
 <body>
   <div id="app">
 
-    <!-- Header -->
-    <header class="header">
-      <div class="logo">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M12 2L4 6v6c0 5.55 3.84 10.74 8 12 4.16-1.26 8-6.45 8-12V6l-8-4z" fill="#b8941f"/>
-          <path d="M9 12l2 2 4-4" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-        <span class="logo-text">CareerLaunch</span>
-      </div>
-      <div class="header-right">
-        <div id="status-dot" class="status-dot offline" title="Not connected"></div>
-        <button id="btn-close" class="btn-icon" title="Close">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    <!-- Top bar -->
+    <div class="topbar">
+      <div class="topbar-right">
+        <div class="menu-wrap">
+          <button id="btn-menu" class="btn-icon" title="More" aria-haspopup="true" aria-expanded="false">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
+          </button>
+          <div id="menu" class="menu" hidden>
+            <div id="menu-plan" class="menu-note" hidden></div>
+            <button id="menu-upload" class="menu-item" type="button">Upload résumé…</button>
+            <a id="open-dashboard" class="menu-item" href="#" target="_blank">Open dashboard</a>
+            <button id="menu-clear" class="menu-item" type="button">Clear conversation</button>
+            <button id="btn-hide" class="menu-item" type="button">Hide on this page</button>
+            <div class="menu-sep"></div>
+            <button id="btn-logout" class="menu-item" type="button">Sign out</button>
+          </div>
+        </div>
+        <button id="btn-close" class="btn-icon" title="Close (⌥X)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
       </div>
-    </header>
+    </div>
 
     <!-- Login view -->
-    <div id="view-login" class="view">
-      <div class="login-hero">
-        <div class="section-title" style="margin-bottom:4px;">Welcome back</div>
-        <p class="hint">Sign in to auto-fill job applications with your profile.</p>
+    <div id="view-login" class="view view-login">
+      <div class="mark">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09"/><path d="M9 12a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.4 22.4 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 .05 5 .05"/></svg>
       </div>
+      <h1 class="title">Sign in to Applyr</h1>
+      <p class="hint">One-time sign-in — you'll stay signed in on this browser.</p>
       <div id="login-error" class="error-msg" style="display:none"></div>
       <button id="btn-login" class="btn btn-google">
         <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" style="flex-shrink:0">
@@ -40,162 +47,74 @@
           <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
           <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
         </svg>
-        Sign in with Google
+        Continue with Google
       </button>
     </div>
 
-    <!-- Main view (logged in) -->
-    <div id="view-main" class="view" style="display:none">
-
-      <!-- User row -->
-      <div class="user-row">
-        <div class="avatar" id="avatar-initials">–</div>
-        <div class="user-info">
-          <div class="profile-name" id="profile-name">Loading…</div>
-          <div id="resume-status" class="resume-status resume-none">Checking resume…</div>
-        </div>
-        <div class="user-actions">
-          <a id="open-dashboard" href="#" target="_blank" class="btn-icon" title="Open Dashboard">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-          </a>
-          <button id="btn-logout" class="btn-icon" title="Sign out">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-          </button>
-        </div>
+    <!-- Paywall view (trial ended / no subscription) -->
+    <div id="view-paywall" class="view view-login" style="display:none">
+      <div class="mark">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09"/><path d="M9 12a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.4 22.4 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 .05 5 .05"/></svg>
       </div>
-
-      <div class="divider"></div>
-
-      <!-- Autofill -->
-      <div class="section">
-        <div class="section-header">
-          <div class="section-title">Auto-fill this page</div>
-          <div id="autofill-badge" class="badge badge-idle">Ready</div>
-        </div>
-        <p class="hint" id="page-host">Detecting form fields…</p>
-        <button id="btn-autofill" class="btn btn-primary">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-          Fill Application
-        </button>
-        <div id="fill-result" class="fill-result" style="display:none"></div>
-      </div>
-
-      <!-- Find Jobs + Autopilot -->
-      <div id="find-jobs-section">
-        <div class="divider"></div>
-        <div class="section">
-          <div class="section-header">
-            <div class="section-title">Find Jobs</div>
-            <div class="badge badge-ai">✨ Auto</div>
-          </div>
-          <div class="find-jobs-fields">
-            <input id="fj-keywords" class="fj-input" type="text" placeholder="Job title, keywords…" autocomplete="off"/>
-            <input id="fj-location" class="fj-input" type="text" placeholder="City, state or Remote" autocomplete="off"/>
-          </div>
-          <div class="fj-types">
-            <label class="fj-type-label"><input type="checkbox" class="fj-type-check" value="fulltime" checked/> Full-time</label>
-            <label class="fj-type-label"><input type="checkbox" class="fj-type-check" value="parttime"/> Part-time</label>
-            <label class="fj-type-label"><input type="checkbox" class="fj-type-check" value="contract"/> Contract</label>
-            <label class="fj-type-label"><input type="checkbox" class="fj-type-check" value="temporary"/> Temporary</label>
-            <label class="fj-type-label"><input type="checkbox" class="fj-type-check" value="internship"/> Internship</label>
-          </div>
-          <div class="fj-actions">
-            <button id="btn-search-indeed" class="btn btn-secondary" type="button">Search on Indeed</button>
-            <button id="btn-auto-apply" class="btn btn-ai" type="button">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-              Auto Apply
-            </button>
-          </div>
-          <!-- Autopilot status (shown when active) -->
-          <div id="autopilot-status" style="display:none">
-            <div id="autopilot-label" class="autopilot-label">Starting…</div>
-            <div class="fj-actions">
-              <button id="btn-autopilot-pause" class="btn btn-secondary" type="button">Pause</button>
-              <button id="btn-autopilot-stop" class="btn btn-secondary" type="button">Stop</button>
-            </div>
-          </div>
-          <!-- Paywall notice -->
-          <div id="autopilot-paywall" class="paywall-notice" style="display:none">
-            <p>You've used your <strong>10 free auto-applications</strong>. Upgrade to keep going.</p>
-            <a id="btn-upgrade" href="#" target="_blank" class="btn btn-ai" style="display:block;text-align:center;text-decoration:none;">Upgrade Now</a>
-          </div>
-          <!-- Missing supplemental pause -->
-          <div id="autopilot-supplemental" style="display:none">
-            <p class="hint" style="margin-bottom:6px">Autopilot needs a few answers to continue:</p>
-            <div id="autopilot-supp-fields"></div>
-            <button id="btn-autopilot-resume-supp" class="btn btn-primary" type="button" style="margin-top:8px">Save &amp; Resume</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Magic Cover Letter (Shown if a cover letter field is detected) -->
-      <div id="cover-letter-section" style="display:none">
-        <div class="divider"></div>
-        <div class="section">
-          <div class="section-header">
-            <div class="section-title">Magic Cover Letter</div>
-            <div class="badge badge-ai">✨ AI</div>
-          </div>
-          <p class="hint">We detected a cover letter field. Let AI write a tailored response for you.</p>
-          <button id="btn-magic-letter" class="btn btn-ai">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14l-5-4.87 6.91-1.01L12 2z"/></svg>
-            Write with AI
-          </button>
-        </div>
-      </div>
-
-      <!-- AI Assistant Copilot -->
-      <div id="ai-assistant-section" style="display:none">
-        <div class="divider"></div>
-        <div class="section">
-          <div class="section-header">
-            <div class="section-title">AI Application Copilot</div>
-            <div class="badge badge-ai">✨ AI</div>
-          </div>
-          <p id="questions-summary" class="hint">We found custom questions. Use AI to answer them based on your resume.</p>
-          <div id="question-actions" class="question-actions" style="display:none">
-            <button id="btn-answer-all" class="btn btn-ai">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14l-5-4.87 6.91-1.01L12 2z"/></svg>
-              Answer All
-            </button>
-            <button id="btn-fill-answered" class="btn btn-primary" type="button">Fill Answered</button>
-            <button id="btn-copy-all" class="btn btn-secondary" type="button">Copy All</button>
-          </div>
-          <div id="custom-questions" class="custom-questions"></div>
-        </div>
-      </div>
-
-      <!-- Missing supplemental fields (shown after autofill detects unanswered questions) -->
-      <div id="missing-section" style="display:none">
-        <div class="divider"></div>
-        <div class="section">
-          <div class="section-title">Complete your profile</div>
-          <p class="hint" style="margin-bottom:8px">These fields were found on this page but aren't saved yet. Fill them in to auto-fill next time.</p>
-          <div id="missing-fields" class="missing-fields"></div>
-          <button id="btn-save-fill" class="btn btn-primary" style="margin-top:10px">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-            Save & Fill
-          </button>
-        </div>
-      </div>
-
-      <div class="divider"></div>
-
-      <!-- Alerts -->
-      <div class="section">
-        <div class="section-header">
-          <div class="section-title">Alerts</div>
-          <div id="alert-count" class="badge badge-warn" style="display:none">0</div>
-        </div>
-        <div id="alerts-list" class="alerts-list">
-          <p class="hint">No pending alerts</p>
-        </div>
-        <button id="btn-open-alerts" class="btn btn-secondary" type="button" style="display:none; margin-top:10px;">
-          Open Pending Questions
-        </button>
-      </div>
-
+      <h1 class="title" id="paywall-title">Your free trial has ended</h1>
+      <p class="hint">Subscribe to keep filling forms, answering questions, and writing cover letters. Monthly or yearly — cancel any time.</p>
+      <a id="btn-subscribe" class="btn btn-primary" href="#" target="_blank">Subscribe</a>
+      <button id="btn-paywall-refresh" class="btn btn-secondary" type="button" style="margin-top:8px">I've subscribed — refresh</button>
     </div>
+
+    <!-- Main view (signed in) -->
+    <div id="view-main" class="view view-main" style="display:none">
+      <div class="scroll" id="scroll">
+
+        <div class="home-head">
+          <div class="mark">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09"/><path d="M9 12a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.4 22.4 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 .05 5 .05"/></svg>
+          </div>
+          <h1 class="title">How can I help you today?</h1>
+        </div>
+
+        <!-- Quick actions -->
+        <div class="actions">
+          <button class="action" id="btn-autofill" type="button">
+            <svg class="action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            <span class="action-label">Fill out this form</span>
+          </button>
+          <button class="action" id="btn-cover-letter" type="button">
+            <svg class="action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+            <span class="action-label">Write a cover letter</span>
+          </button>
+          <button class="action" id="btn-save-job" type="button">
+            <svg class="action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+            <span class="action-label">Save this job</span>
+          </button>
+          <button class="action" id="btn-translate" type="button">
+            <svg class="action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8l6 6"/><path d="M4 14l6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="M22 22l-5-10-5 10"/><path d="M14 18h6"/></svg>
+            <span class="action-label">Translate this page</span>
+          </button>
+        </div>
+
+        <p class="hint page-line" id="page-host"></p>
+
+        <!-- Conversation -->
+        <div id="ask-thread" class="thread"></div>
+      </div>
+
+      <!-- Ask box (pinned to bottom) -->
+      <div class="ask-box">
+        <textarea id="ask-input" rows="1" placeholder="Ask Applyr…" spellcheck="true"></textarea>
+        <div class="ask-row">
+          <button id="ask-attach" class="btn-icon attach" type="button" title="Add your résumé (PDF or Word)">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </button>
+          <input id="resume-file" type="file" accept=".pdf,.docx,.doc,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword" hidden />
+          <span class="ask-hint">Uses your résumé + this page</span>
+          <button id="ask-send" class="send" type="button" title="Send (Enter)" disabled>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
   </div>
   <script src="popup.js"></script>
 </body>

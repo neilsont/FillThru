@@ -36,7 +36,7 @@ function showNotification(alert) {
   chrome.notifications.create({
     type: "basic",
     iconUrl: "icons/icon48.png",
-    title: "CareerLaunch — Action Required",
+    title: "Applyr — Action Required",
     message: alert.blocker_detail ?? "A job application needs your attention",
     priority: 1,
   });
@@ -120,12 +120,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "CL_TOGGLE_SELF") {
     const tabId = sender.tab?.id;
     if (tabId) {
-      chrome.tabs.sendMessage(tabId, { type: "CL_TOGGLE_OVERLAY" }).then(sendResponse);
+      chrome.tabs.sendMessage(tabId, { type: "CL_CLOSE_ASSISTANT" }).then(sendResponse);
       return true;
     }
     chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
       if (tab?.id) {
-        chrome.tabs.sendMessage(tab.id, { type: "CL_TOGGLE_OVERLAY" }).then(sendResponse).catch((error) => {
+        chrome.tabs.sendMessage(tab.id, { type: "CL_CLOSE_ASSISTANT" }).then(sendResponse).catch((error) => {
           sendResponse({ error: error?.message || "Could not close overlay" });
         });
       } else {
@@ -204,7 +204,7 @@ async function runAutopilotStep(tabId) {
     await setAutopilotState({ active: true, paused: true, pauseReason: "blocker", currentStep: "paused" });
     chrome.notifications.create({
       type: "basic", iconUrl: "icons/icon48.png",
-      title: "CareerLaunch Autopilot Paused",
+      title: "Applyr Autopilot Paused",
       message: `Manual action required: ${pageState.blockerType || "blocker detected"}. Open the extension to resume.`,
       priority: 2,
     });
@@ -230,7 +230,7 @@ async function runAutopilotStep(tabId) {
       });
       chrome.notifications.create({
         type: "basic", iconUrl: "icons/icon48.png",
-        title: "CareerLaunch Autopilot Paused",
+        title: "Applyr Autopilot Paused",
         message: `Need ${autofillResult.skippedFields.length} answer(s) to continue. Open the extension.`,
         priority: 2,
       });
@@ -290,7 +290,7 @@ async function advanceAutopilotToNextJob(tabId, state, appliedCount) {
     setActionBadge("", null);
     chrome.notifications.create({
       type: "basic", iconUrl: "icons/icon48.png",
-      title: "CareerLaunch Autopilot Complete",
+      title: "Applyr Autopilot Complete",
       message: `Applied to ${appliedCount} job${appliedCount !== 1 ? "s" : ""}. Check your dashboard.`,
     });
     return;
@@ -381,12 +381,12 @@ chrome.runtime.onInstalled.addListener(() => {
 
 // ── Action (Icon Click) ───────────────────────────────────────────────────
 
-chrome.action.onClicked.addListener(async (tab) => {
+async function summonAssistant(tab) {
   // If the browser UI can't be injected (e.g. chrome:// or edge:// pages), skip
-  if (!tab.url || tab.url.startsWith("chrome://") || tab.url.startsWith("edge://")) return;
+  if (!tab?.id || !tab.url || tab.url.startsWith("chrome://") || tab.url.startsWith("edge://")) return;
 
   try {
-    // Send message to content script to toggle the overlay
+    // Send message to content script to toggle the assistant panel
     await chrome.tabs.sendMessage(tab.id, { type: "CL_TOGGLE_OVERLAY" });
   } catch (err) {
     // Content script might not be injected yet. Inject it and retry.
@@ -400,6 +400,32 @@ chrome.action.onClicked.addListener(async (tab) => {
         chrome.tabs.sendMessage(tab.id, { type: "CL_TOGGLE_OVERLAY" }).catch(() => {});
       }, 200);
     }
+  }
+}
+
+chrome.action.onClicked.addListener(summonAssistant);
+
+// Chrome binds suggested_key only on first install and silently skips
+// conflicts. If ⌥C didn't get bound, send the user to the one place it can be set.
+chrome.runtime.onInstalled.addListener(async ({ reason }) => {
+  if (reason !== "install" && reason !== "update") return;
+  try {
+    const commands = await chrome.commands.getAll();
+    const toggle = commands.find((c) => c.name === "toggle-assistant");
+    if (toggle && !toggle.shortcut) {
+      chrome.tabs.create({ url: "chrome://extensions/shortcuts" });
+    }
+  } catch (err) {
+    console.warn("Could not verify shortcuts:", err);
+  }
+});
+
+// ⌥C opens / ⌥X closes — see "commands" in manifest.json
+chrome.commands.onCommand.addListener(async (command, tab) => {
+  if (!tab) [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (command === "toggle-assistant") return summonAssistant(tab);
+  if (command === "close-assistant" && tab?.id) {
+    chrome.tabs.sendMessage(tab.id, { type: "CL_CLOSE_ASSISTANT" }).catch(() => {});
   }
 });
 
