@@ -1115,9 +1115,19 @@
     else removeOverlay();
   }
 
+  function reportLauncherState() {
+    try {
+      chrome.runtime.sendMessage({
+        type: "CL_LAUNCHER_STATE_SET",
+        state: launcher ? { visible: true, open: launcher.open } : null,
+      }).catch(() => {});
+    } catch { /* extension reloaded underneath us */ }
+  }
+
   function setPanelOpen(open) {
     if (!launcher) return;
     launcher.open = open;
+    reportLauncherState();
     launcher.panel.classList.toggle("open", open);
     launcher.button.classList.toggle("active", open);
     launcher.button.setAttribute("aria-expanded", String(open));
@@ -1249,12 +1259,25 @@
     document.documentElement.appendChild(host);
 
     launcher = { host, button, panel, frame, open: false };
+    reportLauncherState();
   }
 
   function removeOverlay() {
     getOverlayRoots().forEach((root) => root.remove());
     launcher = null;
+    reportLauncherState();
   }
+
+  // Page loaded in a tab where Fillthru was showing? Bring it back, chat and all.
+  (async () => {
+    try {
+      const state = await chrome.runtime.sendMessage({ type: "CL_LAUNCHER_STATE_GET" });
+      if (state?.visible && !syncLauncherReference()) {
+        injectLauncher();
+        if (state.open) requestAnimationFrame(() => setPanelOpen(true));
+      }
+    } catch { /* not injected by the extension, or worker asleep */ }
+  })();
 
   // ── Translate page (Chrome built-in Translator API: on-device, free) ──────
   // Swaps visible text nodes + placeholders in place and remembers the originals

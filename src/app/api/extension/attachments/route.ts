@@ -22,6 +22,17 @@ export async function OPTIONS() {
 const MAX_BYTES = 15 * 1024 * 1024;
 const MAX_CHARS = 40_000;
 
+// Cheap heuristic so the panel can offer "use this as your résumé" without a model call.
+function looksLikeResume(text: string): boolean {
+  if (text.length > 20_000) return false;
+  const t = text.toLowerCase();
+  const sections = ["experience", "education", "skills", "employment", "work history", "summary", "certifications"]
+    .filter((w) => t.includes(w)).length;
+  const contact = /@[a-z0-9.-]+\.[a-z]{2,}/.test(t) || /\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}/.test(t) || t.includes("linkedin.com/in/");
+  const jobPosting = /\b(we are looking for|responsibilities|requirements|about the role|apply now|equal opportunity)\b/.test(t);
+  return sections >= 3 && contact && !jobPosting;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const token = request.headers.get("Authorization")?.replace("Bearer ", "").trim();
@@ -77,7 +88,7 @@ export async function POST(request: NextRequest) {
 
     const truncated = text.length > MAX_CHARS;
     return NextResponse.json(
-      { name: file.name, kind, ocr, chars: text.length, truncated, text: truncated ? text.slice(0, MAX_CHARS) : text },
+      { name: file.name, kind, ocr, chars: text.length, truncated, looksLikeResume: looksLikeResume(text), text: truncated ? text.slice(0, MAX_CHARS) : text },
       { headers: CORS_HEADERS }
     );
   } catch (err) {

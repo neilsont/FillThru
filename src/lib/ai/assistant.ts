@@ -50,7 +50,8 @@ export type AssistantAction =
   | { type: "resume_autopilot" }
   | { type: "stop_autopilot" }
   | { type: "translate_page"; target?: string }
-  | { type: "insert_text"; text: string };
+  | { type: "insert_text"; text: string }
+  | { type: "set_resume"; name?: string };
 
 export interface AssistantTurn {
   reply: string;
@@ -82,6 +83,7 @@ Actions you may emit:
   { "type": "pause_autopilot" } / { "type": "resume_autopilot" } / { "type": "stop_autopilot" } — when the user says pause / resume / stop (Autopilot runs silently in the background otherwise)
   { "type": "translate_page", "target": "en" }             — translate the whole page into a language code
   { "type": "insert_text", "text": string }                — put text into the field the user last clicked
+  { "type": "set_resume", "name": string }                 — save an ATTACHED FILE as the user's résumé (only when they confirm they want that; name = the attachment's file name)
 
 Rules:
 1. Fill only with values you are confident about, taken from WHAT YOU KNOW or from what the user just told you. Never invent names, dates, numbers, or answers.
@@ -93,7 +95,7 @@ Rules:
 7. If the user asks about themselves ("do I have React experience?") answer from WHAT YOU KNOW; if it isn't there, say so and offer to remember it.
 8. Keep replies short. When you filled fields, say how many and what you still need. Never claim you filled something you didn't put in "fill".
 9. If there is no résumé and little known about the user, that's fine — work from what they tell you and remember it.
-10. ATTACHED FILES are documents the user added to this conversation (a job description, a cover-letter draft, notes, a previous application…). Use them to answer, fill, and write. If an attachment is clearly a job posting and the page has none, treat it as the job posting. Attachments are not the user's résumé unless they say so.`;
+10. ATTACHED FILES are documents the user added to this conversation (a job description, a cover-letter draft, notes, a previous application…). Use them to answer, fill, and write. If an attachment is clearly a job posting and the page has none, treat it as the job posting. Attachments are not the user's résumé unless they say so — when they do ("use this as my résumé", "yes, replace it"), emit set_resume with that file's name.`;
 
 function describeFields(fields: PageField[] = []): string {
   if (!fields.length) return "(no fillable fields detected on this page)";

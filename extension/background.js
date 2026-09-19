@@ -105,16 +105,38 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   if (message.type === "CL_GET_CURRENT_TAB_INFO") {
     if (sender.tab) {
-      sendResponse({ url: sender.tab.url, title: sender.tab.title });
+      sendResponse({ id: sender.tab.id, url: sender.tab.url, title: sender.tab.title });
     } else {
       // Fallback: This might happen if called from outside a tab context
       chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
-        if (tab) sendResponse({ url: tab.url, title: tab.title });
+        if (tab) sendResponse({ id: tab.id, url: tab.url, title: tab.title });
         else sendResponse(null);
       });
       return true;
     }
     return false;
+  }
+
+  // Launcher visibility per tab, so a page load inside the same tab brings the
+  // button (and an open chat) back instead of starting from nothing.
+  if (message.type === "CL_LAUNCHER_STATE_GET") {
+    const tabId = sender.tab?.id;
+    if (!tabId) { sendResponse(null); return true; }
+    chrome.storage.session.get("launcher_state").then(({ launcher_state }) => {
+      sendResponse(launcher_state?.[tabId] ?? null);
+    });
+    return true;
+  }
+  if (message.type === "CL_LAUNCHER_STATE_SET") {
+    const tabId = sender.tab?.id;
+    if (!tabId) { sendResponse(null); return true; }
+    chrome.storage.session.get("launcher_state").then(({ launcher_state }) => {
+      const next = { ...(launcher_state ?? {}) };
+      if (message.state) next[tabId] = message.state;
+      else delete next[tabId];
+      return chrome.storage.session.set({ launcher_state: next });
+    }).then(() => sendResponse({ ok: true }));
+    return true;
   }
 
   if (message.type === "CL_TOGGLE_SELF") {
@@ -429,6 +451,19 @@ chrome.commands.onCommand.addListener(async (command, tab) => {
   if (command === "fillthru-close" && tab?.id) {
     chrome.tabs.sendMessage(tab.id, { type: "CL_CLOSE_ASSISTANT" }).catch(() => {});
   }
+});
+
+// Forget per-tab launcher + chat state when the tab goes away.
+chrome.tabs.onRemoved.addListener(async (tabId) => {
+  try {
+    const { launcher_state, chat_recent } = await chrome.storage.session.get(["launcher_state", "chat_recent"]);
+    const next = { ...(launcher_state ?? {}) };
+    delete next[tabId];
+    const updates = { launcher_state: next };
+    if (chat_recent?.tabId === tabId) updates.chat_recent = null;
+    await chrome.storage.session.set(updates);
+    await chrome.storage.session.remove(`chat:${tabId}`);
+  } catch { /* session storage unavailable */ }
 });
 
 // ── Init ─────────────────────────────────────────────────────────────────

@@ -93,6 +93,16 @@
           </button>
         </div>
 
+        <!-- Pick up a chat from another tab -->
+        <div id="move-here" class="move-here" hidden>
+          <div class="move-here-text">
+            <span class="move-here-title" id="move-here-title"></span>
+            <span class="move-here-sub" id="move-here-sub"></span>
+          </div>
+          <button id="btn-move-here" class="btn btn-secondary" type="button">Move here</button>
+          <button id="btn-move-dismiss" class="btn-icon" type="button" title="Dismiss">×</button>
+        </div>
+
         <!-- Conversation -->
         <div id="ask-thread" class="thread"></div>
       </div>
@@ -102,21 +112,9 @@
         <div id="composer-files" class="composer-files" hidden></div>
         <textarea id="ask-input" rows="1" placeholder="Ask Fillthru…" spellcheck="true"></textarea>
         <div class="ask-row">
-          <div class="attach-wrap">
-            <button id="ask-attach" class="btn-icon attach" type="button" title="Add" aria-haspopup="true" aria-expanded="false">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            </button>
-            <div id="attach-menu" class="menu menu-up" hidden>
-              <button class="menu-item menu-item-rich" type="button" data-pick="file">
-                <span class="menu-item-title">Add file</span>
-                <span class="menu-item-sub">Job description, screenshot, notes — context for this chat</span>
-              </button>
-              <button class="menu-item menu-item-rich" type="button" data-pick="resume">
-                <span class="menu-item-title">Set my résumé</span>
-                <span class="menu-item-sub">PDF, Word, or a photo — replaces the one on file</span>
-              </button>
-            </div>
-          </div>
+          <button id="ask-attach" class="btn-icon attach" type="button" title="Add a file — résumé, job description, screenshot, notes">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </button>
           <input id="resume-file" type="file" hidden />
           <span class="ask-hint">Uses your résumé + this page</span>
           <button id="ask-send" class="send" type="button" title="Send (Enter)" disabled>

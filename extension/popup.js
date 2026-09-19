@@ -41,7 +41,9 @@ const askSend = $("ask-send");
 const askAttach = $("ask-attach");
 const resumeFile = $("resume-file");
 const composerFiles = $("composer-files");
-const attachMenu = $("attach-menu");
+const moveHere = $("move-here");
+const btnMoveHere = $("btn-move-here");
+const btnMoveDismiss = $("btn-move-dismiss");
 const scrollArea = $("scroll");
 
 // ── Networking ──────────────────────────────────────────────────────────────
@@ -305,6 +307,7 @@ function showMainView(profileData, { quiet = false } = {}) {
   renderPlanNote(entitlement);
   if (!alreadyShowing) {
     watchAutopilot();
+    restoreChat();
     askInput.focus();
   }
   void quiet;
@@ -351,7 +354,10 @@ function scrollToBottom() {
   scrollArea.scrollTop = scrollArea.scrollHeight;
 }
 
-function appendMessage(role, text, { error = false, thinking = false } = {}) {
+// What's on screen, in a form that can be replayed after a page load.
+const threadLog = []; // [{ kind: "user"|"assistant", text, error, file: {name,size,type,role}, textActions }]
+
+function appendMessage(role, text, { error = false, thinking = false, record = true, textActions = false } = {}) {
   const wrap = document.createElement("div");
   wrap.className = `msg msg-${role}${error ? " error" : ""}`;
   const bubble = document.createElement("div");
@@ -360,13 +366,18 @@ function appendMessage(role, text, { error = false, thinking = false } = {}) {
   wrap.appendChild(bubble);
   askThread.appendChild(wrap);
   scrollToBottom();
-  return { wrap, bubble };
+  const entry = { kind: role, text, error, textActions };
+  if (record && !thinking) { threadLog.push(entry); persistChat(); }
+  return { wrap, bubble, entry };
 }
 
-function resolveMessage(pending, text, { error = false } = {}) {
+function resolveMessage(pending, text, { error = false, textActions = false } = {}) {
   pending.bubble.classList.remove("thinking");
   pending.bubble.textContent = text;
   if (error) pending.wrap.classList.add("error");
+  if (textActions) addTextActions(pending.wrap, text);
+  threadLog.push({ kind: "assistant", text, error, textActions });
+  persistChat();
   scrollToBottom();
 }
 
@@ -396,7 +407,7 @@ function buildFileChip(file, { removable = false, onRemove = null, role = "file"
   return chip;
 }
 
-function appendUserMessage({ text = "", file = null, role = "file" } = {}) {
+function appendUserMessage({ text = "", file = null, role = "file", record = true } = {}) {
   const wrap = document.createElement("div");
   wrap.className = "msg msg-user";
   if (file) wrap.appendChild(buildFileChip(file, { role }));
@@ -408,7 +419,103 @@ function appendUserMessage({ text = "", file = null, role = "file" } = {}) {
   }
   askThread.appendChild(wrap);
   scrollToBottom();
+  if (record) {
+    threadLog.push({ kind: "user", text, file: file ? { name: file.name, size: file.size, type: file.type, role } : null });
+    persistChat();
+  }
   return wrap;
+}
+
+// ── Chat persistence (per tab, session storage) ─────────────────────────────
+// A page load inside the tab replays the conversation; another tab can pull it
+// over with "Move here", like Gemini's side panel.
+
+let currentTabId = null;
+let persistTimer = null;
+
+async function getTabId() {
+  if (currentTabId != null) return currentTabId;
+  const info = await getTabInfo().catch(() => null);
+  currentTabId = info?.id ?? null;
+  return currentTabId;
+}
+
+function chatSnapshot() {
+  return {
+    log: threadLog.slice(-80),
+    history: chatHistory.slice(-30),
+    attachments: chatAttachments.map((a) => ({ name: a.name, text: a.text })),
+    pendingQuestions,
+    at: Date.now(),
+  };
+}
+
+function persistChat() {
+  clearTimeout(persistTimer);
+  persistTimer = setTimeout(async () => {
+    const tabId = await getTabId();
+    if (tabId == null || !chrome.storage?.session) return;
+    if (!threadLog.length) {
+      chrome.storage.session.remove(`chat:${tabId}`).catch(() => {});
+      return;
+    }
+    const info = await getTabInfo().catch(() => null);
+    let host = "";
+    try { host = new URL(info?.url || "").hostname.replace(/^www\./, ""); } catch { host = ""; }
+    const firstUser = threadLog.find((e) => e.kind === "user" && e.text)?.text || threadLog.find((e) => e.kind === "user" && e.file)?.file?.name || "Conversation";
+    chrome.storage.session.set({
+      [`chat:${tabId}`]: chatSnapshot(),
+      chat_recent: { tabId, host, preview: firstUser.slice(0, 80), count: threadLog.length, at: Date.now() },
+    }).catch(() => {});
+  }, 150);
+}
+
+function replayChat(snapshot) {
+  askThread.replaceChildren();
+  threadLog.length = 0;
+  chatHistory.length = 0;
+  chatAttachments.length = 0;
+  for (const e of snapshot.log || []) {
+    if (e.kind === "user") {
+      const file = e.file ? { name: e.file.name, size: e.file.size, type: e.file.type } : null;
+      appendUserMessage({ text: e.text, file, role: e.file?.role || "file", record: false });
+    } else {
+      const m = appendMessage("assistant", e.text, { error: Boolean(e.error), record: false });
+      if (e.textActions) addTextActions(m.wrap, e.text);
+    }
+    threadLog.push(e);
+  }
+  chatHistory.push(...(snapshot.history || []));
+  chatAttachments.push(...(snapshot.attachments || []));
+  pendingQuestions = snapshot.pendingQuestions || [];
+  scrollToBottom();
+}
+
+async function restoreChat() {
+  if (!chrome.storage?.session) return;
+  const tabId = await getTabId();
+  if (tabId == null) return;
+  const { [`chat:${tabId}`]: own, chat_recent: recent } = await chrome.storage.session.get([`chat:${tabId}`, "chat_recent"]);
+  if (own?.log?.length) {
+    replayChat(own);
+    return;
+  }
+  // Nothing here — offer the most recent chat from another tab (within a day).
+  if (recent && recent.tabId !== tabId && Date.now() - recent.at < 86_400_000) {
+    const { [`chat:${recent.tabId}`]: theirs } = await chrome.storage.session.get(`chat:${recent.tabId}`);
+    if (!theirs?.log?.length) return;
+    $("move-here-title").textContent = recent.preview || "Conversation";
+    $("move-here-sub").textContent = `${recent.host ? `On ${recent.host} · ` : ""}${recent.count} message${recent.count === 1 ? "" : "s"}`;
+    moveHere.hidden = false;
+    btnMoveHere.onclick = async () => {
+      moveHere.hidden = true;
+      replayChat(theirs);
+      await chrome.storage.session.remove(`chat:${recent.tabId}`).catch(() => {});
+      persistChat();
+      askInput.focus();
+    };
+    btnMoveDismiss.onclick = () => { moveHere.hidden = true; };
+  }
 }
 
 function makeButton(className, label, onClick) {
@@ -597,6 +704,13 @@ async function runAction(action, token) {
     case "pause_autopilot":
     case "resume_autopilot":
     case "stop_autopilot": return controlAutopilot(action.type, token);
+    case "set_resume": {
+      const name = action.name || [...attachedFiles.keys()].pop();
+      const file = name && attachedFiles.get(name);
+      if (!file) return "I don't have that file any more — add it again with + and I'll set it as your résumé.";
+      const summary = await uploadResume(file);
+      return summary || "";
+    }
     default: return "";
   }
 }
@@ -646,7 +760,7 @@ async function writeCoverLetter(token, notes = "") {
   const fillRes = await relayToContent({ type: "CL_FILL_COVER_LETTER", text: coverLetter });
   if (fillRes?.ok) return `Cover letter for ${info.title || "this role"}${info.company ? ` at ${info.company}` : ""} written into the page.`;
 
-  const msg = appendMessage("assistant", coverLetter);
+  const msg = appendMessage("assistant", coverLetter, { textActions: true });
   addTextActions(msg.wrap, coverLetter);
   return "";
 }
@@ -899,8 +1013,26 @@ async function submitAsk() {
 
   const extracted = await extractAttachment(file.file);
   if (!extracted) return;
+
+  // Looks like a résumé and there's none on file → it becomes the résumé, no questions asked.
+  if (extracted.looksLikeResume && !cachedProfile?.profile) {
+    const summary = await uploadResume(file.file);
+    if (!summary) return;
+    if (question) {
+      await runTurn({ intent: "chat", userMessage: `${question}\n(attached résumé: ${file.file.name} — now on file)`, alreadyRendered: true });
+    } else {
+      appendMessage("assistant", summary);
+      chatHistory.push({ role: "user", content: `(attached résumé: ${file.file.name})` }, { role: "assistant", content: summary });
+    }
+    return;
+  }
+
   chatAttachments.push(extracted);
-  const note = `(attached file: ${extracted.name}${extracted.truncated ? ", long — first part only" : ""})`;
+  attachedFiles.set(extracted.name, file.file);
+  let note = `(attached file: ${extracted.name}${extracted.truncated ? ", long — first part only" : ""})`;
+  if (extracted.looksLikeResume) {
+    note += " This looks like a résumé and the user already has one on file — ask in one short sentence whether to replace it, unless the message already says.";
+  }
   if (question) {
     await runTurn({ intent: "chat", userMessage: `${question}\n${note}`, alreadyRendered: true });
   } else {
@@ -923,6 +1055,7 @@ askSend.addEventListener("click", submitAsk);
 
 let pendingFile = null; // { file, role: "file" | "resume" }
 let pickRole = "file";
+const attachedFiles = new Map(); // name → File, kept for a later "use this as my résumé"
 
 const IMAGE_ACCEPT = ".png,.jpg,.jpeg,.webp,.heic,.heif,.gif,image/*";
 const ACCEPT = {
@@ -943,33 +1076,15 @@ function clearPendingFile() {
   renderPendingFile();
 }
 
-function closeAttachMenu() {
-  attachMenu.hidden = true;
-  askAttach.setAttribute("aria-expanded", "false");
-}
-
 function openPicker(role) {
   closeMenu();
-  closeAttachMenu();
   pickRole = role;
   resumeFile.accept = ACCEPT[role];
   resumeFile.value = "";
   resumeFile.click();
 }
 
-askAttach.addEventListener("click", (event) => {
-  event.stopPropagation();
-  const open = attachMenu.hidden;
-  attachMenu.hidden = !open;
-  askAttach.setAttribute("aria-expanded", String(open));
-});
-attachMenu.addEventListener("click", (event) => {
-  const item = event.target.closest("[data-pick]");
-  if (item) openPicker(item.dataset.pick);
-});
-document.addEventListener("click", (event) => {
-  if (!attachMenu.hidden && !attachMenu.contains(event.target)) closeAttachMenu();
-});
+askAttach.addEventListener("click", () => openPicker("file"));
 menuUpload.addEventListener("click", () => openPicker("resume"));
 
 resumeFile.addEventListener("change", () => {
@@ -996,7 +1111,7 @@ async function extractAttachment(file) {
     }, { fallbackMessage: "Couldn't read that file", timeoutMs: 90000, timeoutMessage: "Reading the file took too long. Please try again." });
     pending.wrap.remove();
     const data = payload.data || {};
-    return { name: data.name || file.name, text: data.text || "", truncated: Boolean(data.truncated) };
+    return { name: data.name || file.name, text: data.text || "", truncated: Boolean(data.truncated), looksLikeResume: Boolean(data.looksLikeResume) };
   } catch (err) {
     if (err?.status !== 402) resolveMessage(pending, err.message || "Couldn't read that file.", { error: true });
     else pending.wrap.remove();
@@ -1058,8 +1173,11 @@ menuClear.addEventListener("click", () => {
   askThread.replaceChildren();
   chatHistory.length = 0;
   chatAttachments.length = 0;
+  attachedFiles.clear();
+  threadLog.length = 0;
   pendingQuestions = [];
   clearPendingFile();
+  persistChat();
 });
 
 btnHide.addEventListener("click", async () => {
