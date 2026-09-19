@@ -54,6 +54,25 @@ export async function POST(request: NextRequest) {
           .slice(0, 6)
           .map((a) => ({ name: a.name.slice(0, 200), text: a.text.slice(0, 40_000) }))
       : [];
+    context.otherTabs = Array.isArray(context.otherTabs)
+      ? context.otherTabs
+          .filter((t) => t && typeof t.id === "number" && typeof t.url === "string")
+          .slice(0, 20)
+          .map((t) => ({
+            id: t.id,
+            title: String(t.title ?? "").slice(0, 120),
+            url: t.url.slice(0, 500),
+            job: t.job && typeof t.job === "object"
+              ? { title: String(t.job.title ?? "").slice(0, 200), company: String(t.job.company ?? "").slice(0, 200), description: String(t.job.description ?? "").slice(0, 3000), url: t.job.url }
+              : null,
+          }))
+      : [];
+    context.priorConversation = Array.isArray(context.priorConversation)
+      ? context.priorConversation
+          .filter((m) => m && (m.role === "user" || m.role === "assistant") && typeof m.content === "string")
+          .slice(-8)
+          .map((m) => ({ role: m.role, content: m.content.slice(0, 1000) }))
+      : [];
     if (intent === "chat" && !messages.some((m) => m.role === "user")) {
       return NextResponse.json({ error: "Nothing to respond to" }, { status: 400, headers: CORS_HEADERS });
     }

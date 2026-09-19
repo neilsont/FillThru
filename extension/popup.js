@@ -42,6 +42,7 @@ const askAttach = $("ask-attach");
 const resumeFile = $("resume-file");
 const composerFiles = $("composer-files");
 const moveHere = $("move-here");
+$("menu-version").textContent = `Fillthru v${chrome.runtime?.getManifest?.().version ?? "dev"}`;
 const btnMoveHere = $("btn-move-here");
 const btnMoveDismiss = $("btn-move-dismiss");
 const scrollArea = $("scroll");
@@ -587,14 +588,41 @@ async function getJobInfo() {
   return (await relayToContent({ type: "CL_EXTRACT_JOB" })) || null;
 }
 
+async function getOtherTabs() {
+  try {
+    const res = await chrome.runtime.sendMessage({ type: "CL_COLLECT_TAB_CONTEXT" });
+    return res?.tabs || [];
+  } catch {
+    return [];
+  }
+}
+
+// The most recent chat on another tab, so "the thing we discussed" carries over
+// without moving the conversation.
+async function getPriorConversation() {
+  try {
+    const tabId = await getTabId();
+    const { chat_recent } = await chrome.storage.session.get("chat_recent");
+    if (!chat_recent || chat_recent.tabId === tabId || Date.now() - chat_recent.at > 86_400_000) return [];
+    const { [`chat:${chat_recent.tabId}`]: theirs } = await chrome.storage.session.get(`chat:${chat_recent.tabId}`);
+    return (theirs?.history || []).slice(-8);
+  } catch {
+    return [];
+  }
+}
+
+let lastContext = null;
+
 async function getPageContext({ includeFields = true } = {}) {
-  const [tab, job, form, sel] = await Promise.all([
+  const [tab, job, form, sel, otherTabs, priorConversation] = await Promise.all([
     getTabInfo().catch(() => null),
     getJobInfo(),
     includeFields ? relayToContent({ type: "CL_SCAN_FORM" }) : null,
     relayToContent({ type: "CL_GET_SELECTION" }),
+    getOtherTabs(),
+    getPriorConversation(),
   ]);
-  return {
+  const ctx = {
     url: tab?.url || "",
     title: tab?.title || "",
     job: job?.title || job?.description ? { title: job.title, company: job.company, description: job.description, url: job.url } : null,
@@ -603,7 +631,11 @@ async function getPageContext({ includeFields = true } = {}) {
     language: sel?.language || "",
     pendingQuestions: pendingQuestions,
     attachments: chatAttachments.map((a) => ({ name: a.name, text: a.text })),
+    otherTabs,
+    priorConversation,
   };
+  lastContext = ctx;
+  return ctx;
 }
 
 // ── The assistant loop ──────────────────────────────────────────────────────
@@ -613,8 +645,8 @@ const chatAttachments = [];   // [{ name, text }] files added to this conversati
 let pendingQuestions = [];    // [{ id, question }] the assistant asked last turn
 let turnInFlight = false;
 
-async function runTurn({ intent = "chat", userMessage = null, includeFields = true, alreadyRendered = false } = {}) {
-  if (turnInFlight) return null;
+async function runTurn({ intent = "chat", userMessage = null, includeFields = true, alreadyRendered = false, rerun = false } = {}) {
+  if (turnInFlight && !rerun) return null;
   const token = await getValidToken();
   if (!token) return null;
 
@@ -639,6 +671,21 @@ async function runTurn({ intent = "chat", userMessage = null, includeFields = tr
     });
 
     const turn = payload.data || {};
+
+    // The assistant wants to read another tab first: fetch it, attach it, and
+    // answer again with the text in hand (once, so it can't loop).
+    const readTab = !rerun && (turn.actions || []).find((a) => a.type === "read_tab");
+    if (readTab) {
+      const page = await chrome.runtime.sendMessage({ type: "CL_READ_TAB", tabId: readTab.id }).catch(() => null);
+      if (page?.text) {
+        chatAttachments.push({ name: `Tab: ${page.title || page.url}`, text: page.text });
+        pending.bubble.textContent = `Reading "${page.title || "that tab"}"…`;
+        turnInFlight = false;
+        pending.wrap.remove();
+        return await runTurn({ intent, includeFields, rerun: true });
+      }
+    }
+
     const notes = await applyTurn(turn, token);
     const reply = [turn.reply, ...notes].filter(Boolean).join("\n");
     resolveMessage(pending, reply || "Done.");
@@ -704,6 +751,8 @@ async function runAction(action, token) {
     case "pause_autopilot":
     case "resume_autopilot":
     case "stop_autopilot": return controlAutopilot(action.type, token);
+    case "read_tab": return "";
+    case "update_job_status": return updateJobStatus(token, action);
     case "set_resume": {
       const name = action.name || [...attachedFiles.keys()].pop();
       const file = name && attachedFiles.get(name);
@@ -731,19 +780,57 @@ async function saveJobToCareerLaunch(token, jobInfo, filledFields = null) {
   return null;
 }
 
+const STAGE_LABELS = { discovered: "Saved", in_progress: "In progress", applied: "Applied", interviewing: "Interviewing", rejected: "Rejected", offer: "Offer" };
+
 async function saveCurrentJob(token) {
   const info = await getJobInfo();
-  if (!info?.title || !info?.url) return "I couldn't find a job posting on this page to save.";
+  if (!info?.title || !info?.url) return "I couldn't find a job posting on this page to save. Open the listing or the application page and try again.";
   const result = await saveJobToCareerLaunch(token, info);
-  if (!result) return "Couldn't save this job right now.";
+  if (!result) return "Couldn't save this job right now — please try again in a moment.";
+  const stage = STAGE_LABELS[result.job?.status] || "In progress";
   return result.created
-    ? `Saved "${info.title}"${info.company ? ` at ${info.company}` : ""} to your tracker.`
-    : `"${info.title}" is already in your tracker.`;
+    ? `Saved "${info.title}"${info.company ? ` at ${info.company}` : ""} to your Applications as ${stage}. Tell me when you've submitted it, hear back, or get an interview and I'll update it.`
+    : `"${info.title}" is already in your Applications (${stage}).`;
+}
+
+async function updateJobStatus(token, action) {
+  const info = await getJobInfo();
+  const body = { status: action.status };
+  if (!action.company && !action.title && info?.url) body.url = info.url;
+  if (action.company) body.company = action.company;
+  if (action.title) body.title = action.title;
+  try {
+    const { payload } = await fetchCareerLaunch("/api/extension/save-job", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+      body: JSON.stringify(body),
+    }, { fallbackMessage: "Could not update the job" });
+    const job = payload.data?.job;
+    return `Marked "${job?.title || "the job"}"${job?.company ? ` at ${job.company}` : ""} as ${STAGE_LABELS[action.status] || action.status}.`;
+  } catch (err) {
+    if (err?.status === 404) return "I couldn't find that job in your Applications. Save it first, or tell me the company name.";
+    if (err?.status === 402) throw err;
+    return err.message || "Couldn't update that job.";
+  }
+}
+
+function findJobElsewhere() {
+  const fromTab = lastContext?.otherTabs?.find((t) => t.job?.title);
+  if (fromTab) return { ...fromTab.job, via: `the "${fromTab.title}" tab` };
+  const jd = chatAttachments.find((a) => /\b(responsibilities|requirements|qualifications|we are looking|about the role)\b/i.test(a.text));
+  if (jd) return { title: "", company: "", description: jd.text.slice(0, 6000), via: jd.name };
+  return null;
 }
 
 async function writeCoverLetter(token, notes = "") {
-  const info = await getJobInfo();
-  if (!info?.title && !info?.description) return "I couldn't find a job posting on this page. Open the listing (or paste the description here) and I'll write it.";
+  let info = await getJobInfo();
+  let via = "";
+  if (!info?.title && !info?.description) {
+    const elsewhere = findJobElsewhere();
+    if (!elsewhere) return "I couldn't find a job posting on this page or your other tabs. Open the listing, or add the description with +, and I'll write it.";
+    info = elsewhere;
+    via = elsewhere.via;
+  }
 
   const { payload } = await fetchCareerLaunch("/api/extension/generate-cover-letter", {
     method: "POST",
@@ -758,7 +845,7 @@ async function writeCoverLetter(token, notes = "") {
   if (!coverLetter) return "The AI returned an empty cover letter — try again.";
 
   const fillRes = await relayToContent({ type: "CL_FILL_COVER_LETTER", text: coverLetter });
-  if (fillRes?.ok) return `Cover letter for ${info.title || "this role"}${info.company ? ` at ${info.company}` : ""} written into the page.`;
+  if (fillRes?.ok) return `Cover letter for ${info.title || "this role"}${info.company ? ` at ${info.company}` : ""}${via ? ` (from ${via})` : ""} written into the page.`;
 
   const msg = appendMessage("assistant", coverLetter, { textActions: true });
   addTextActions(msg.wrap, coverLetter);

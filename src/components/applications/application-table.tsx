@@ -7,17 +7,28 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowUpDown } from "lucide-react";
 import type { ApplicationWithJob } from "@/types/application";
+import { useUpdateJob } from "@/hooks/use-jobs";
+import type { JobStatus } from "@/types/database";
+import { useQueryClient } from "@tanstack/react-query";
 
 type SortKey = "title" | "company" | "status" | "match_score" | "updated_at";
 
-const STATUS_VARIANT: Record<string, "default" | "secondary" | "success" | "destructive" | "warning"> = {
-  draft: "secondary",
-  ready: "default",
-  submitted: "success",
-  withdrawn: "destructive",
-};
+// Pipeline stages (jobs.status). The application row's own draft/submitted
+// status is an internal detail; this is what the user tracks.
+const STAGES: { value: string; label: string; variant: "default" | "secondary" | "success" | "destructive" | "warning" }[] = [
+  { value: "discovered", label: "Saved", variant: "secondary" },
+  { value: "in_progress", label: "In progress", variant: "default" },
+  { value: "applied", label: "Applied", variant: "success" },
+  { value: "interviewing", label: "Interviewing", variant: "warning" },
+  { value: "offer", label: "Offer", variant: "success" },
+  { value: "rejected", label: "Rejected", variant: "destructive" },
+];
+const STAGE_ORDER = Object.fromEntries(STAGES.map((s, i) => [s.value, i]));
+const stageOf = (value: string) => STAGES.find((s) => s.value === value) ?? { value, label: value, variant: "secondary" as const };
 
 export function ApplicationTable({ applications }: { applications: ApplicationWithJob[] }) {
+  const updateJob = useUpdateJob();
+  const queryClient = useQueryClient();
   const [sortKey, setSortKey] = useState<SortKey>("updated_at");
   const [sortAsc, setSortAsc] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -25,7 +36,7 @@ export function ApplicationTable({ applications }: { applications: ApplicationWi
   const filtered = useMemo(() => {
     let result = applications;
     if (statusFilter !== "all") {
-      result = result.filter((a) => a.status === statusFilter);
+      result = result.filter((a) => a.job.status === statusFilter);
     }
     return [...result].sort((a, b) => {
       let aVal: string | number = "";
@@ -41,8 +52,8 @@ export function ApplicationTable({ applications }: { applications: ApplicationWi
           bVal = b.job.company.toLowerCase();
           break;
         case "status":
-          aVal = a.status;
-          bVal = b.status;
+          aVal = STAGE_ORDER[a.job.status] ?? 99;
+          bVal = STAGE_ORDER[b.job.status] ?? 99;
           break;
         case "match_score":
           aVal = a.job.match_score ?? 0;
@@ -88,11 +99,10 @@ export function ApplicationTable({ applications }: { applications: ApplicationWi
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All statuses</SelectItem>
-            <SelectItem value="draft">Draft</SelectItem>
-            <SelectItem value="ready">Ready</SelectItem>
-            <SelectItem value="submitted">Submitted</SelectItem>
-            <SelectItem value="withdrawn">Withdrawn</SelectItem>
+            <SelectItem value="all">All stages</SelectItem>
+            {STAGES.map((s) => (
+              <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+            ))}
           </SelectContent>
         </Select>
         <span className="text-xs text-muted-foreground ml-auto">
@@ -125,9 +135,26 @@ export function ApplicationTable({ applications }: { applications: ApplicationWi
                 </TableCell>
                 <TableCell className="hidden sm:table-cell text-sm">{app.job.company}</TableCell>
                 <TableCell>
-                  <Badge variant={STATUS_VARIANT[app.status] || "secondary"} className="text-[11px]">
-                    {app.status}
-                  </Badge>
+                  <Select
+                    value={app.job.status}
+                    onValueChange={(value) =>
+                      updateJob.mutate(
+                        { id: app.job_id, status: value as JobStatus },
+                        { onSuccess: () => queryClient.invalidateQueries({ queryKey: ["applications"] }) }
+                      )
+                    }
+                  >
+                    <SelectTrigger className="h-7 w-auto border-none bg-transparent p-0 shadow-none focus:ring-0 [&>svg]:ml-1 [&>svg]:h-3 [&>svg]:w-3 [&>svg]:opacity-0 group-hover:[&>svg]:opacity-60">
+                      <Badge variant={stageOf(app.job.status).variant} className="text-[11px] cursor-pointer">
+                        {stageOf(app.job.status).label}
+                      </Badge>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {STAGES.map((s) => (
+                        <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </TableCell>
                 <TableCell className="hidden md:table-cell text-sm">
                   {app.job.match_score !== null ? `${app.job.match_score}%` : "-"}

@@ -117,6 +117,46 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return false;
   }
 
+  // What else is open: titles/URLs of the user's other tabs, plus any job
+  // posting detected on them, so the assistant can use a JD from one tab to
+  // fill a form on another. Only detected postings are read, never full pages.
+  if (message.type === "CL_COLLECT_TAB_CONTEXT") {
+    (async () => {
+      const excludeId = sender.tab?.id ?? message.excludeTabId;
+      const tabs = (await chrome.tabs.query({}))
+        .filter((t) => t.id !== excludeId && /^https?:/.test(t.url || "") && !t.discarded)
+        .slice(0, 20);
+      const results = await Promise.all(tabs.map(async (t) => {
+        const entry = { id: t.id, title: (t.title || "").slice(0, 120), url: t.url, active: t.active };
+        try {
+          const job = await Promise.race([
+            chrome.tabs.sendMessage(t.id, { type: "CL_EXTRACT_JOB" }),
+            new Promise((resolve) => setTimeout(() => resolve(null), 1200)),
+          ]);
+          if (job?.title && (job.description || job.company)) {
+            entry.job = { title: job.title, company: job.company, description: (job.description || "").slice(0, 3000), url: job.url || t.url };
+          }
+        } catch { /* no content script on that tab (chrome://, PDF, not yet loaded) */ }
+        return entry;
+      }));
+      sendResponse({ tabs: results });
+    })();
+    return true;
+  }
+
+  // Ask a specific tab for its readable text (used when the assistant emits read_tab).
+  if (message.type === "CL_READ_TAB") {
+    (async () => {
+      try {
+        const res = await chrome.tabs.sendMessage(message.tabId, { type: "CL_PAGE_TEXT" });
+        sendResponse(res || null);
+      } catch (err) {
+        sendResponse({ error: err?.message || "That tab can't be read." });
+      }
+    })();
+    return true;
+  }
+
   // Launcher visibility per tab, so a page load inside the same tab brings the
   // button (and an open chat) back instead of starting from nothing.
   if (message.type === "CL_LAUNCHER_STATE_GET") {

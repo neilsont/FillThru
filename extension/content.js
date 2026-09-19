@@ -1664,6 +1664,16 @@
     return { filled: results.filter((r) => r.ok && r.changed !== false).length, results };
   }
 
+  // The page's main text, for "read that tab": prefers <main>/<article>, skips
+  // nav/footers/our own UI, collapses whitespace, caps at 12k chars.
+  function readablePageText() {
+    const root = document.querySelector("main, article, [role='main']") || document.body;
+    const clone = root.cloneNode(true);
+    clone.querySelectorAll(`script, style, noscript, svg, nav, footer, header, aside, [aria-hidden='true'], #${OVERLAY_ROOT_ID}`).forEach((el) => el.remove());
+    const text = (clone.innerText || clone.textContent || "").replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").replace(/[ \t]{2,}/g, " ").trim();
+    return text.slice(0, 12000);
+  }
+
   // Track the last non-empty selection: clicking into our panel (an iframe) can
   // collapse it before the user asks "translate this".
   let lastSelection = "";
@@ -1719,6 +1729,15 @@
 
     if (message.type === "CL_INSERT_AT_FOCUS") {
       sendResponse(insertAtFocus(message.text || ""));
+      return true;
+    }
+
+    if (message.type === "CL_PAGE_TEXT") {
+      try {
+        sendResponse({ title: document.title, url: location.href, text: readablePageText() });
+      } catch (err) {
+        sendResponse({ error: err.message });
+      }
       return true;
     }
 

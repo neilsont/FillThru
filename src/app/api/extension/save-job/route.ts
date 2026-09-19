@@ -2,6 +2,19 @@ import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
 import { userIsPremium } from "@/lib/subscription";
 
+// Pipeline stages a job can be in (matches the job_status enum).
+const JOB_STATUSES = ["discovered", "in_progress", "applied", "interviewing", "rejected", "offer"] as const;
+type JobStatus = (typeof JOB_STATUSES)[number];
+
+function sourceForUrl(url: string): "indeed" | "linkedin" | "other" {
+  try {
+    const host = new URL(url).hostname;
+    if (/(^|\.)indeed\./.test(host)) return "indeed";
+    if (/(^|\.)linkedin\./.test(host)) return "linkedin";
+  } catch { /* not a URL */ }
+  return "other";
+}
+
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, PATCH, OPTIONS",
@@ -35,11 +48,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "subscription_required" }, { status: 402, headers: CORS_HEADERS });
     }
 
-    const { title, company, url, location, description, filled_fields } = await request.json();
+    const { title, company, url, location, description, filled_fields, status: requestedStatus } = await request.json();
 
     if (!url) {
       return NextResponse.json({ error: "url is required" }, { status: 400, headers: CORS_HEADERS });
     }
+    const initialStatus: JobStatus = JOB_STATUSES.includes(requestedStatus) ? requestedStatus : "in_progress";
 
     // Step 1: Handle Job record
     let jobId: string;
@@ -62,8 +76,8 @@ export async function POST(request: NextRequest) {
           location: location || null,
           description: description || null,
           url,
-          source: "extension",
-          status: "in_progress",
+          source: sourceForUrl(url),
+          status: initialStatus,
         })
         .select("id")
         .single();
@@ -107,7 +121,8 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ job: { id: jobId }, created: !existingJob }, { headers: CORS_HEADERS });
+    const { data: savedJob } = await supabase.from("jobs").select("id, title, company, status").eq("id", jobId).single();
+    return NextResponse.json({ job: savedJob ?? { id: jobId }, created: !existingJob }, { headers: CORS_HEADERS });
   } catch (error) {
     console.error("Extension save-job error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500, headers: CORS_HEADERS });
@@ -134,21 +149,41 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "subscription_required" }, { status: 402, headers: CORS_HEADERS });
     }
 
-    const { url, status } = await request.json();
-    if (!url || !status) return NextResponse.json({ error: "url and status are required" }, { status: 400, headers: CORS_HEADERS });
+    const { url, company, title, status } = await request.json();
+    if (!JOB_STATUSES.includes(status)) {
+      return NextResponse.json({ error: `status must be one of: ${JOB_STATUSES.join(", ")}` }, { status: 400, headers: CORS_HEADERS });
+    }
+    if (!url && !company && !title) {
+      return NextResponse.json({ error: "url, company, or title is required" }, { status: 400, headers: CORS_HEADERS });
+    }
 
-    const { data: job } = await supabase.from("jobs").select("id").eq("user_id", user.id).eq("url", url).maybeSingle();
+    // Find the job: exact URL first, then the most recent match on company/title.
+    let job: { id: string; title: string; company: string } | null = null;
+    if (url) {
+      ({ data: job } = await supabase.from("jobs").select("id, title, company").eq("user_id", user.id).eq("url", url).maybeSingle());
+    }
+    if (!job && (company || title)) {
+      let q = supabase.from("jobs").select("id, title, company").eq("user_id", user.id).order("updated_at", { ascending: false }).limit(1);
+      if (company) q = q.ilike("company", `%${company}%`);
+      if (title) q = q.ilike("title", `%${title}%`);
+      ({ data: job } = await q.maybeSingle());
+    }
     if (!job) return NextResponse.json({ error: "Job not found" }, { status: 404, headers: CORS_HEADERS });
 
-    await supabase
-      .from("applications")
-      .update({ status, updated_at: new Date().toISOString() })
-      .eq("user_id", user.id)
-      .eq("job_id", job.id);
+    const now = new Date().toISOString();
+    await supabase.from("jobs").update({ status, updated_at: now }).eq("id", job.id).eq("user_id", user.id);
 
-    await supabase.from("jobs").update({ status }).eq("id", job.id).eq("user_id", user.id);
+    // The application record tracks submission separately (application_status enum).
+    if (status === "applied" || status === "interviewing" || status === "offer") {
+      await supabase
+        .from("applications")
+        .update({ status: "submitted", submitted_at: now, updated_at: now })
+        .eq("user_id", user.id)
+        .eq("job_id", job.id)
+        .is("submitted_at", null);
+    }
 
-    return NextResponse.json({ ok: true }, { headers: CORS_HEADERS });
+    return NextResponse.json({ ok: true, job: { ...job, status } }, { headers: CORS_HEADERS });
   } catch (error) {
     console.error("Extension save-job PATCH error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500, headers: CORS_HEADERS });

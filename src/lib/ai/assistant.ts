@@ -25,8 +25,17 @@ export interface ChatAttachment {
   text: string;
 }
 
+export interface OtherTab {
+  id: number;
+  title: string;
+  url: string;
+  job?: { title?: string; company?: string; description?: string; url?: string } | null;
+}
+
 export interface PageContext {
   attachments?: ChatAttachment[];
+  otherTabs?: OtherTab[];
+  priorConversation?: ChatMessage[];
   url?: string;
   title?: string;
   job?: { title?: string; company?: string; description?: string; url?: string } | null;
@@ -51,7 +60,9 @@ export type AssistantAction =
   | { type: "stop_autopilot" }
   | { type: "translate_page"; target?: string }
   | { type: "insert_text"; text: string }
-  | { type: "set_resume"; name?: string };
+  | { type: "set_resume"; name?: string }
+  | { type: "read_tab"; id: number }
+  | { type: "update_job_status"; status: "in_progress" | "applied" | "interviewing" | "rejected" | "offer"; company?: string; title?: string };
 
 export interface AssistantTurn {
   reply: string;
@@ -84,6 +95,8 @@ Actions you may emit:
   { "type": "translate_page", "target": "en" }             — translate the whole page into a language code
   { "type": "insert_text", "text": string }                — put text into the field the user last clicked
   { "type": "set_resume", "name": string }                 — save an ATTACHED FILE as the user's résumé (only when they confirm they want that; name = the attachment's file name)
+  { "type": "read_tab", "id": number }                     — fetch the full text of one of OTHER OPEN TABS when its title/job summary isn't enough; you'll get the text next turn
+  { "type": "update_job_status", "status": "in_progress"|"applied"|"interviewing"|"rejected"|"offer", "company": string, "title": string } — when the user says they submitted, got an interview, an offer, or a rejection (company/title identify the job if it isn't the one on this page)
 
 Rules:
 1. Fill only with values you are confident about, taken from WHAT YOU KNOW or from what the user just told you. Never invent names, dates, numbers, or answers.
@@ -95,6 +108,8 @@ Rules:
 7. If the user asks about themselves ("do I have React experience?") answer from WHAT YOU KNOW; if it isn't there, say so and offer to remember it.
 8. Keep replies short. When you filled fields, say how many and what you still need. Never claim you filled something you didn't put in "fill".
 9. If there is no résumé and little known about the user, that's fine — work from what they tell you and remember it.
+11. OTHER OPEN TABS lists the user's other browser tabs. If this page has no job posting but another tab does, use that posting (for cover letters, fit questions, filling). If a tab's title suggests it has what you need but no posting was detected, emit read_tab with its id — once — rather than guessing.
+12. PREVIOUS CONVERSATION is a chat the user had on another tab; treat it as earlier context, not as this page.
 10. ATTACHED FILES are documents the user added to this conversation (a job description, a cover-letter draft, notes, a previous application…). Use them to answer, fill, and write. If an attachment is clearly a job posting and the page has none, treat it as the job posting. Attachments are not the user's résumé unless they say so — when they do ("use this as my résumé", "yes, replace it"), emit set_resume with that file's name.`;
 
 function describeFields(fields: PageField[] = []): string {
@@ -124,6 +139,22 @@ function describeAttachments(attachments: ChatAttachment[] = []): string {
     if (budget <= 0) break;
   }
   return "ATTACHED FILES:\n" + parts.join("\n\n");
+}
+
+function describeOtherTabs(tabs: OtherTab[] = []): string {
+  if (!tabs.length) return "";
+  const lines = tabs.slice(0, 20).map((t) => {
+    const base = `- id=${t.id} | "${t.title}" | ${t.url}`;
+    return t.job?.title
+      ? `${base}\n    job posting: ${JSON.stringify({ title: t.job.title, company: t.job.company, description: (t.job.description ?? "").slice(0, 2500) })}`
+      : base;
+  });
+  return "OTHER OPEN TABS:\n" + lines.join("\n");
+}
+
+function describePriorConversation(messages: ChatMessage[] = []): string {
+  if (!messages.length) return "";
+  return "PREVIOUS CONVERSATION (another tab):\n" + messages.slice(-8).map((m) => `${m.role === "user" ? "USER" : "ASSISTANT"}: ${m.content.slice(0, 600)}`).join("\n");
 }
 
 function intentInstruction(intent: AssistantIntent): string {
@@ -177,6 +208,10 @@ export function buildAssistantPrompt(args: {
     describeFields(context.fields),
     "",
     describeAttachments(context.attachments),
+    "",
+    describeOtherTabs(context.otherTabs),
+    "",
+    describePriorConversation(context.priorConversation),
     "",
     context.pendingQuestions?.length
       ? `PENDING QUESTIONS you asked last turn (map the user's answers to these ids):\n${context.pendingQuestions.map((q) => `- id=${q.id ?? "null"}: ${q.question}`).join("\n")}`
