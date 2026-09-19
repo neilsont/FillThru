@@ -45,7 +45,7 @@ export function LoginForm() {
     <Card className="shadow-sm border-border/60">
       <CardHeader className="text-center pb-4">
         <CardTitle className="text-xl">Welcome back</CardTitle>
-        <CardDescription>Sign in to your CareerLaunch account</CardDescription>
+        <CardDescription>Sign in to your Fillthru account</CardDescription>
       </CardHeader>
       <CardContent className="pb-0 space-y-4">
         <OAuthButtons next="/dashboard" />

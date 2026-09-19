@@ -50,7 +50,7 @@ export function SignupForm() {
     <Card className="shadow-sm border-border/60">
       <CardHeader className="text-center pb-4">
         <CardTitle className="text-xl">Create your account</CardTitle>
-        <CardDescription>Get started with CareerLaunch in seconds</CardDescription>
+        <CardDescription>Get started with Fillthru in seconds</CardDescription>
       </CardHeader>
       <CardContent className="pb-0 space-y-4">
         <OAuthButtons next="/onboarding" />
@@ -111,7 +111,7 @@ export function SignupForm() {
               <Link href="/privacy" target="_blank" className="text-primary font-medium hover:underline">
                 Privacy Policy
               </Link>
-              . I understand that CareerLaunch will store and process my resume and application data to provide its services.
+              . I understand that Fillthru will store and process my resume and application data to provide its services.
             </label>
           </div>
         </CardContent>

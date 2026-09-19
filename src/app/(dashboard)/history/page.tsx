@@ -44,7 +44,7 @@ export default function HistoryPage() {
     <div>
       <PageHeader
         title="AI History"
-        description="Everything CareerLaunch has generated for you in the last 30 days"
+        description="Everything Fillthru has generated for you in the last 30 days"
       />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">

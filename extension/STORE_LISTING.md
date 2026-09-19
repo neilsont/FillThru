@@ -37,10 +37,10 @@ What it can do:
 
 Your data stays yours. The extension only reads a page when you use it, only talks to Fillthru servers, and does not sell or share your information.
 
-A free Fillthru account is required: https://careerlaunch1.vercel.app
+A free Fillthru account is required: https://fillthru.com
 
-**Official URL / Homepage:** https://careerlaunch1.vercel.app
-**Support URL:** https://careerlaunch1.vercel.app
+**Official URL / Homepage:** https://fillthru.com
+**Support URL:** https://fillthru.com
 
 ### Graphic assets (upload as PNG or JPEG)
 
@@ -104,7 +104,7 @@ Certify all three:
 - ☑ I do not use or transfer user data for purposes unrelated to my item's single purpose
 - ☑ I do not use or transfer user data to determine creditworthiness or for lending purposes
 
-**Privacy policy URL:** https://careerlaunch1.vercel.app/privacy
+**Privacy policy URL:** https://fillthru.com/privacy
 
 ---
 

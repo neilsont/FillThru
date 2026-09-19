@@ -17,11 +17,12 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://fillthru.com"),
   title: {
-    default: "CareerLaunch - AI-Powered Job Application Assistant",
-    template: "%s | CareerLaunch",
+    default: "Fillthru — Fill out job applications with AI",
+    template: "%s | Fillthru",
   },
-  description: "Upload your resume, discover jobs, and apply with AI-powered assistance.",
+  description: "A Chrome assistant that fills out job applications, answers screening questions, and writes cover letters from your résumé — on any site.",
 };
 
 export default function RootLayout({

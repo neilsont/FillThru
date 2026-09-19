@@ -78,7 +78,7 @@ export function Sidebar() {
             className="flex items-center gap-2.5 hover:opacity-80 transition-opacity"
           >
             <Rocket className="h-5 w-5 text-indigo-400 shrink-0" />
-            <span className="font-semibold text-[15px] tracking-tight text-white">CareerLaunch</span>
+            <span className="font-semibold text-[15px] tracking-tight text-white">Fillthru</span>
           </Link>
           <button
             onClick={() => setMobileMenuOpen(false)}
@@ -104,7 +104,7 @@ export function Sidebar() {
           <Rocket className="h-5 w-5 text-indigo-400 shrink-0" />
           {!sidebarCollapsed && (
             <span className="font-semibold text-[15px] tracking-tight text-white">
-              CareerLaunch
+              Fillthru
             </span>
           )}
         </Link>

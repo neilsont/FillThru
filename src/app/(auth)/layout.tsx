@@ -12,7 +12,7 @@ export default function AuthLayout({
         <div className="flex items-center justify-center h-10 w-10 rounded-xl bg-primary">
           <Rocket className="h-5 w-5 text-white" />
         </div>
-        <span className="text-xl font-bold tracking-tight">CareerLaunch</span>
+        <span className="text-xl font-bold tracking-tight">Fillthru</span>
       </Link>
       <div className="w-full max-w-[400px]">{children}</div>
     </div>

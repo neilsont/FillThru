@@ -29,7 +29,7 @@ export default async function HomePage() {
             <div className="flex items-center justify-center h-9 w-9 rounded-xl bg-primary shadow-lg shadow-primary/20">
               <Rocket className="h-5 w-5 text-white" />
             </div>
-            <span className="font-bold text-lg tracking-tight text-primary">CareerLaunch</span>
+            <span className="font-bold text-lg tracking-tight text-primary">Fillthru</span>
           </div>
           
           <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-muted-foreground">
@@ -209,7 +209,7 @@ export default async function HomePage() {
                   {[
                     "One-click form auto-filling on top sites",
                     "AI-generated cover letters tailored to the job",
-                    "Directly syncs with your CareerLaunch profile",
+                    "Directly syncs with your Fillthru profile",
                     "Handles complex questions with smart logic"
                   ].map((item) => (
                     <li key={item} className="flex items-start gap-3 text-lg text-muted-foreground/80">
@@ -292,7 +292,7 @@ export default async function HomePage() {
               <div className="h-6 w-6 rounded bg-primary flex items-center justify-center">
                 <Rocket className="h-3 w-3 text-white" />
               </div>
-              <span className="font-bold text-primary">CareerLaunch</span>
+              <span className="font-bold text-primary">Fillthru</span>
             </div>
             
             <nav className="flex justify-center gap-8 mb-8 text-sm font-medium text-muted-foreground/60">

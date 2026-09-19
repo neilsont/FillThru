@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
       jobId = newJob.id;
     }
 
-    // Step 2: Handle Application record (tracking "Applications adding to CareerLaunch Applications")
+    // Step 2: Handle Application record (tracking "Applications adding to Fillthru Applications")
     const { data: existingApp } = await supabase
       .from("applications")
       .select("id, status")

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Rocket } from "lucide-react";
 
 export const metadata = {
-  title: "Privacy Policy — CareerLaunch",
+  title: "Privacy Policy — Fillthru",
 };
 
 export default function PrivacyPolicyPage() {
@@ -14,24 +14,24 @@ export default function PrivacyPolicyPage() {
             <div className="flex items-center justify-center h-7 w-7 rounded-lg bg-primary">
               <Rocket className="h-4 w-4 text-white" />
             </div>
-            <span className="font-bold text-primary">CareerLaunch</span>
+            <span className="font-bold text-primary">Fillthru</span>
           </Link>
         </div>
       </header>
 
       <main className="max-w-4xl mx-auto px-6 py-16">
         <h1 className="text-4xl font-extrabold text-primary mb-2">Privacy Policy</h1>
-        <p className="text-muted-foreground mb-10">Last updated: April 5, 2026</p>
+        <p className="text-muted-foreground mb-10">Last updated: September 19, 2026</p>
 
         <div className="prose prose-neutral max-w-none space-y-10 text-[15px] leading-relaxed text-foreground/80">
 
           <section>
             <h2 className="text-xl font-bold text-primary mb-3">1. Introduction</h2>
             <p>
-              Welcome to CareerLaunch, operated by Wilson Digital (&ldquo;we,&rdquo; &ldquo;our,&rdquo; or &ldquo;us&rdquo;). We are committed to protecting your personal information and your right to privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our website and browser extension (collectively, the &ldquo;Service&rdquo;).
+              Welcome to Fillthru, operated by Jicsaw LLC (&ldquo;we,&rdquo; &ldquo;our,&rdquo; or &ldquo;us&rdquo;). We are committed to protecting your personal information and your right to privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our website and browser extension (collectively, the &ldquo;Service&rdquo;).
             </p>
             <p className="mt-3">
-              By using CareerLaunch, you agree to the collection and use of information in accordance with this policy. If you do not agree, please do not use our Service.
+              By using Fillthru, you agree to the collection and use of information in accordance with this policy. If you do not agree, please do not use our Service.
             </p>
           </section>
 
@@ -56,7 +56,7 @@ export default function PrivacyPolicyPage() {
 
             <h3 className="font-semibold text-foreground mt-5 mb-2">Information from the Browser Extension</h3>
             <p>
-              The CareerLaunch browser extension reads job posting content from pages you visit solely to assist with auto-filling applications. This data is processed in real time and is not stored on our servers unless you explicitly save a job to your dashboard.
+              The Fillthru browser extension reads job posting content from pages you visit solely to assist with auto-filling applications. This data is processed in real time and is not stored on our servers unless you explicitly save a job to your dashboard.
             </p>
           </section>
 
@@ -133,7 +133,7 @@ export default function PrivacyPolicyPage() {
           <section>
             <h2 className="text-xl font-bold text-primary mb-3">9. Children&apos;s Privacy</h2>
             <p>
-              CareerLaunch is not directed to individuals under the age of 16. We do not knowingly collect personal information from children under 16. If we become aware that a child has provided us with personal data, we will delete it promptly.
+              Fillthru is not directed to individuals under the age of 16. We do not knowingly collect personal information from children under 16. If we become aware that a child has provided us with personal data, we will delete it promptly.
             </p>
           </section>
 
@@ -150,8 +150,8 @@ export default function PrivacyPolicyPage() {
               If you have questions or concerns about this Privacy Policy, please contact us at:
             </p>
             <div className="mt-3 p-4 bg-white rounded-xl border border-border/50">
-              <p className="font-semibold text-foreground">Wilson Digital</p>
-              <p>CareerLaunch Support</p>
+              <p className="font-semibold text-foreground">Jicsaw LLC</p>
+              <p>Fillthru Support</p>
               <a href="mailto:cosmispenguin2@gmail.com" className="text-primary underline">cosmispenguin2@gmail.com</a>
             </div>
           </section>
@@ -159,7 +159,7 @@ export default function PrivacyPolicyPage() {
       </main>
 
       <footer className="border-t border-border/40 py-8 text-center text-xs text-muted-foreground/50 mt-16">
-        &copy; 2026 Wilson Digital. All rights reserved.{" "}
+        &copy; 2026 Jicsaw LLC. All rights reserved.{" "}
         <Link href="/terms" className="hover:text-primary transition-colors">Terms of Service</Link>{" · "}
         <Link href="/privacy" className="hover:text-primary transition-colors">Privacy Policy</Link>
       </footer>

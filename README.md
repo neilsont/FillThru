@@ -22,7 +22,7 @@ This project uses [`next/font`](https://nextjs.org/docs/app/building-your-applic
 
 ## Data layer
 
-CareerLaunch uses two databases, each for what it's good at:
+Fillthru uses two databases, each for what it's good at:
 
 | Store | Holds | Why |
 |---|---|---|

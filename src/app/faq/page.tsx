@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Rocket, ChevronDown } from "lucide-react";
 
 export const metadata = {
-  title: "FAQ — CareerLaunch",
+  title: "FAQ — Fillthru",
 };
 
 const faqs: { category: string; items: { q: string; a: string }[] }[] = [
@@ -10,20 +10,20 @@ const faqs: { category: string; items: { q: string; a: string }[] }[] = [
     category: "Getting Started",
     items: [
       {
-        q: "What is CareerLaunch?",
-        a: "CareerLaunch is an AI-powered job application platform. It combines a job tracker dashboard with a browser extension that auto-fills applications using your saved resume and profile data. You can also generate tailored cover letters with AI in seconds.",
+        q: "What is Fillthru?",
+        a: "Fillthru is an AI-powered job application platform. It combines a job tracker dashboard with a browser extension that auto-fills applications using your saved resume and profile data. You can also generate tailored cover letters with AI in seconds.",
       },
       {
         q: "How do I get started?",
-        a: "Create a free account at careerlaunch.app, upload your resume on the Profile page, and the AI will automatically extract your information. Install the browser extension, log in, and you're ready to start auto-filling job applications.",
+        a: "Create a free account at fillthru.com, upload your resume on the Profile page, and the AI will automatically extract your information. Install the browser extension, log in, and you're ready to start auto-filling job applications.",
       },
       {
-        q: "Is CareerLaunch free to use?",
+        q: "Is Fillthru free to use?",
         a: "You get a 7-day free trial with everything included — the browser extension, form filling, AI answers, cover letters, and Autopilot — no card required. After the trial, a monthly or yearly subscription keeps everything running. See your Profile page for current pricing.",
       },
       {
         q: "What browsers does the extension support?",
-        a: "The CareerLaunch browser extension is available for Google Chrome and Chromium-based browsers (Edge, Brave, Arc). Firefox support is planned for a future release.",
+        a: "The Fillthru browser extension is available for Google Chrome and Chromium-based browsers (Edge, Brave, Arc). Firefox support is planned for a future release.",
       },
     ],
   },
@@ -44,7 +44,7 @@ const faqs: { category: string; items: { q: string; a: string }[] }[] = [
       },
       {
         q: "Can I use the same account on multiple devices?",
-        a: "Yes. Your CareerLaunch account syncs across all devices. Log in on any browser and your jobs, applications, and profile will be up to date.",
+        a: "Yes. Your Fillthru account syncs across all devices. Log in on any browser and your jobs, applications, and profile will be up to date.",
       },
     ],
   },
@@ -61,7 +61,7 @@ const faqs: { category: string; items: { q: string; a: string }[] }[] = [
       },
       {
         q: "Can I upload multiple resumes?",
-        a: "Currently, CareerLaunch stores one active resume per account. Uploading a new resume replaces the previous one. Multi-resume support is on our roadmap.",
+        a: "Currently, Fillthru stores one active resume per account. Uploading a new resume replaces the previous one. Multi-resume support is on our roadmap.",
       },
       {
         q: "What is the 'Supplemental Info' section?",
@@ -74,7 +74,7 @@ const faqs: { category: string; items: { q: string; a: string }[] }[] = [
     items: [
       {
         q: "How does the auto-fill work?",
-        a: "When you're on a job application page, click the CareerLaunch extension icon and press 'Fill Application'. The extension reads the form fields on the page and matches them to your saved profile data, filling in your name, contact info, work history, and more automatically.",
+        a: "When you're on a job application page, click the Fillthru extension icon and press 'Fill Application'. The extension reads the form fields on the page and matches them to your saved profile data, filling in your name, contact info, work history, and more automatically.",
       },
       {
         q: "The extension isn't filling some fields — why?",
@@ -86,7 +86,7 @@ const faqs: { category: string; items: { q: string; a: string }[] }[] = [
       },
       {
         q: "How do I generate a cover letter with the extension?",
-        a: "On any job page, click the CareerLaunch extension icon and select 'Write with AI'. The extension reads the job description and generates a tailored cover letter based on your profile. You can copy and paste it directly into the application.",
+        a: "On any job page, click the Fillthru extension icon and select 'Write with AI'. The extension reads the job description and generates a tailored cover letter based on your profile. You can copy and paste it directly into the application.",
       },
       {
         q: "Why does the extension ask for access to all websites?",
@@ -127,12 +127,12 @@ const faqs: { category: string; items: { q: string; a: string }[] }[] = [
         a: "Yes. Your resume and profile data is stored securely in our database with encryption at rest and row-level security (only you can access your own data). We do not sell your data or share it with employers. See our Privacy Policy for full details.",
       },
       {
-        q: "Does CareerLaunch share my information with employers?",
-        a: "No. CareerLaunch never contacts employers on your behalf or shares your information with them. All application submissions are done by you, in your browser.",
+        q: "Does Fillthru share my information with employers?",
+        a: "No. Fillthru never contacts employers on your behalf or shares your information with them. All application submissions are done by you, in your browser.",
       },
       {
         q: "Is my payment information secure?",
-        a: "All payments are processed by Stripe, a PCI-DSS Level 1 certified payment processor. CareerLaunch never sees or stores your card number.",
+        a: "All payments are processed by Stripe, a PCI-DSS Level 1 certified payment processor. Fillthru never sees or stores your card number.",
       },
     ],
   },
@@ -147,7 +147,7 @@ export default function FAQPage() {
             <div className="flex items-center justify-center h-7 w-7 rounded-lg bg-primary">
               <Rocket className="h-4 w-4 text-white" />
             </div>
-            <span className="font-bold text-primary">CareerLaunch</span>
+            <span className="font-bold text-primary">Fillthru</span>
           </Link>
           <a
             href="mailto:cosmispenguin2@gmail.com"
@@ -162,7 +162,7 @@ export default function FAQPage() {
         <div className="text-center mb-14">
           <h1 className="text-4xl font-extrabold text-primary mb-3">Frequently Asked Questions</h1>
           <p className="text-muted-foreground text-lg max-w-xl mx-auto">
-            Everything you need to know about CareerLaunch. Can&apos;t find your answer?{" "}
+            Everything you need to know about Fillthru. Can&apos;t find your answer?{" "}
             <a href="mailto:cosmispenguin2@gmail.com" className="text-primary hover:underline">
               Contact our support team.
             </a>

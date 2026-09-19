@@ -2,10 +2,10 @@
 // Runs inside the iframe that content.js injects. Talks to the Fillthru API with a
 // Supabase bearer token and to the page through the background relay.
 
-const DEFAULT_BASE_URL = "https://careerlaunch1.vercel.app";
+const DEFAULT_BASE_URL = "https://fillthru.com";
 const BASE_URL_CANDIDATES = [
   DEFAULT_BASE_URL,
-  "https://career-launch-taylorneilson-projects.vercel.app",
+  "https://careerlaunch1.vercel.app",
   "http://localhost:3000",
   "http://127.0.0.1:3000",
 ];

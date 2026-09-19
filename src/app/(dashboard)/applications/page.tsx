@@ -19,7 +19,7 @@ export default function ApplicationsPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `careerlaunch-applications-${new Date().toISOString().split("T")[0]}.csv`;
+    a.download = `fillthru-applications-${new Date().toISOString().split("T")[0]}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
