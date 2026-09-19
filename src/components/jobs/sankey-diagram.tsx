@@ -228,7 +228,7 @@ export function SankeyDiagram() {
             Upgrade to Premium to drag-and-drop your applications in the visual pipeline flow right from your phone.
           </p>
           <button
-            onClick={handleUpgrade}
+            onClick={() => handleUpgrade("month")}
             disabled={upgrading}
             className="inline-flex items-center justify-center h-10 px-5 rounded-lg bg-accent text-white font-medium text-sm transition-colors hover:bg-accent/90 shadow-sm disabled:opacity-70"
           >

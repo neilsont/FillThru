@@ -6,11 +6,15 @@ import { ResumeSection } from "@/components/profile/resume-section";
 import { SupplementalForm } from "@/components/profile/supplemental-form";
 import { AIModelSelector } from "@/components/profile/ai-model-selector";
 import { AutoApplySettings } from "@/components/profile/auto-apply-settings";
+import { PlanCard } from "@/components/profile/plan-card";
 
 export default function ProfilePage() {
   return (
     <div>
       <PageHeader title="My Profile" description="Manage your resume and application preferences" />
+      <div className="mb-6">
+        <PlanCard />
+      </div>
       <Tabs defaultValue="resume">
         <TabsList>
           <TabsTrigger value="resume">Resume</TabsTrigger>

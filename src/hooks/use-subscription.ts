@@ -3,8 +3,21 @@
 import { useEffect, useState } from "react";
 import { useToast } from "@/components/ui/toast";
 
+export type PlanInterval = "month" | "year";
+
+export interface SubscriptionStatus {
+  isPremium: boolean;
+  reason: "admin" | "subscription" | "trial" | "trial_expired" | "inactive" | "signed_out";
+  status: string | null;
+  trialEndsAt: string | null;
+  trialDaysLeft: number | null;
+  currentPeriodEnd: string | null;
+  planInterval: PlanInterval | null;
+}
+
 export function useSubscription() {
   const [isPremium, setIsPremium] = useState(false);
+  const [status, setStatus] = useState<SubscriptionStatus | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [upgrading, setUpgrading] = useState(false);
   const { toast } = useToast();
@@ -12,8 +25,9 @@ export function useSubscription() {
   const checkStatus = async () => {
     try {
       const res = await fetch("/api/stripe/status");
-      const data = await res.json();
+      const data = (await res.json()) as SubscriptionStatus;
       setIsPremium(data.isPremium ?? false);
+      setStatus(data);
     } catch (err) {
       console.error("Failed to fetch subscription status:", err);
     } finally {
@@ -25,10 +39,14 @@ export function useSubscription() {
     checkStatus();
   }, []);
 
-  async function handleUpgrade() {
+  async function handleUpgrade(interval: PlanInterval = "month") {
     setUpgrading(true);
     try {
-      const res = await fetch("/api/stripe/checkout", { method: "POST" });
+      const res = await fetch("/api/stripe/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ interval }),
+      });
       const data = await res.json();
       if (data.url) {
         window.location.href = data.url;
@@ -52,6 +70,9 @@ export function useSubscription() {
 
   return {
     isPremium,
+    status,
+    isTrialing: status?.reason === "trial",
+    trialDaysLeft: status?.trialDaysLeft ?? null,
     isLoading,
     upgrading,
     handleUpgrade,

@@ -8,7 +8,7 @@ import {
 } from "@/lib/ai";
 import { DEFAULT_MODEL, type AIModel } from "@/lib/ai/types";
 import { ParsedResume } from "@/types/resume";
-import { isPaidModel, userIsPremium } from "@/lib/subscription";
+import { userIsPremium } from "@/lib/subscription";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -63,8 +63,9 @@ export async function POST(request: NextRequest) {
     const requestedModel = model as AIModel;
     const isPremium = await userIsPremium(supabase, user.id, user.email);
 
-    if (isPaidModel(requestedModel) && !isPremium) {
-      return NextResponse.json({ error: "premium_required" }, { status: 402, headers: CORS_HEADERS });
+    // Every AI feature requires an active trial or subscription.
+    if (!isPremium) {
+      return NextResponse.json({ error: "subscription_required" }, { status: 402, headers: CORS_HEADERS });
     }
 
     // Fetch resume data

@@ -1,5 +1,6 @@
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
+import { getEntitlement, TRIAL_DAYS } from "@/lib/subscription";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -53,11 +54,18 @@ export async function GET(request: NextRequest) {
 
     const parsed = resumeRow?.parsed_json as Record<string, unknown> | null;
 
+    // Also starts the 7-day trial the first time this user opens the extension.
+    const entitlement = await getEntitlement(supabase, user.id, user.email);
+    const trialDaysLeft = entitlement.trialEndsAt
+      ? Math.max(0, Math.ceil((new Date(entitlement.trialEndsAt).getTime() - Date.now()) / 86_400_000))
+      : null;
+
     return NextResponse.json(
       {
         user: { id: user.id, email: user.email },
         profile: parsed ?? null,
         supplemental,
+        entitlement: { ...entitlement, trialDaysLeft, trialDays: TRIAL_DAYS },
       },
       { headers: CORS_HEADERS }
     );

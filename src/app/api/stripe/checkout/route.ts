@@ -1,8 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
-import { getStripe, PREMIUM_PRICE_ID } from "@/lib/stripe";
-import { NextResponse } from "next/server";
+import { getAppUrl, getStripe, parseInterval, PRICE_IDS } from "@/lib/stripe";
+import { NextRequest, NextResponse } from "next/server";
 
-export async function POST() {
+export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -11,37 +11,48 @@ export async function POST() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    if (!process.env.STRIPE_SECRET_KEY || !PREMIUM_PRICE_ID) {
-      return NextResponse.json({ error: "Stripe configuration is missing. Please add STRIPE_SECRET_KEY and STRIPE_PRICE_ID to your environment variables." }, { status: 500 });
+    const body = await request.json().catch(() => ({}));
+    const interval = parseInterval(body?.interval);
+    const priceId = PRICE_IDS[interval];
+
+    if (!process.env.STRIPE_SECRET_KEY || !priceId) {
+      return NextResponse.json(
+        { error: `Stripe is not configured for the ${interval}ly plan. Set STRIPE_SECRET_KEY and STRIPE_PRICE_ID_${interval === "year" ? "YEARLY" : "MONTHLY"}.` },
+        { status: 500 }
+      );
     }
 
     const { data: sub } = await supabase
       .from("user_subscriptions")
-      .select("stripe_customer_id")
+      .select("stripe_customer_id, status")
       .eq("user_id", user.id)
-      .single();
+      .maybeSingle();
 
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    if (sub?.status === "active") {
+      return NextResponse.json({ error: "already_subscribed" }, { status: 409 });
+    }
+
+    const baseUrl = getAppUrl();
 
     const session = await getStripe().checkout.sessions.create({
       mode: "subscription",
-      payment_method_types: ["card"],
+      // No payment_method_types: Stripe picks card + Apple Pay / Google Pay / Link automatically.
       customer: sub?.stripe_customer_id ?? undefined,
       customer_email: sub?.stripe_customer_id ? undefined : user.email,
-      line_items: [{ price: PREMIUM_PRICE_ID, quantity: 1 }],
-      success_url: `${baseUrl}/dashboard?upgraded=1`,
-      cancel_url: `${baseUrl}/profile`,
-      metadata: { user_id: user.id },
-      subscription_data: { metadata: { user_id: user.id } },
+      client_reference_id: user.id,
+      line_items: [{ price: priceId, quantity: 1 }],
+      allow_promotion_codes: true,
+      billing_address_collection: "auto",
+      success_url: `${baseUrl}/dashboard?checkout=success`,
+      cancel_url: `${baseUrl}/profile?checkout=cancelled`,
+      metadata: { user_id: user.id, plan_interval: interval },
+      subscription_data: { metadata: { user_id: user.id, plan_interval: interval } },
     });
 
     return NextResponse.json({ url: session.url });
-  } catch (error: any) {
-    console.error("Stripe Checkout Error:", {
-      message: error.message,
-      stack: error.stack,
-      raw: error,
-    });
-    return NextResponse.json({ error: error.message || "Failed to create checkout session" }, { status: 500 });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Failed to create checkout session";
+    console.error("Stripe Checkout Error:", error);
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

@@ -1,5 +1,6 @@
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
+import { userIsPremium } from "@/lib/subscription";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -28,6 +29,10 @@ export async function POST(request: NextRequest) {
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
     if (authError || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: CORS_HEADERS });
+    }
+
+    if (!(await userIsPremium(supabase, user.id, user.email))) {
+      return NextResponse.json({ error: "subscription_required" }, { status: 402, headers: CORS_HEADERS });
     }
 
     const { title, company, url, location, description, filled_fields } = await request.json();
@@ -124,6 +129,10 @@ export async function PATCH(request: NextRequest) {
 
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
     if (authError || !user) return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: CORS_HEADERS });
+
+    if (!(await userIsPremium(supabase, user.id, user.email))) {
+      return NextResponse.json({ error: "subscription_required" }, { status: 402, headers: CORS_HEADERS });
+    }
 
     const { url, status } = await request.json();
     if (!url || !status) return NextResponse.json({ error: "url and status are required" }, { status: 400, headers: CORS_HEADERS });

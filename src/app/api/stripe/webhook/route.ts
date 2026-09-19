@@ -29,9 +29,25 @@ export async function POST(request: NextRequest) {
   const supabase = getServiceClient();
   console.log(`[Stripe Webhook] Received event: ${event.id} type: ${event.type}`);
 
-  // Helper to get status string based on active/trialing
-  const getAppStatus = (stripeStatus: string) => {
-    return (stripeStatus === "active" || stripeStatus === "trialing") ? "active" : "inactive";
+  // active / trialing → access. past_due → keep access while Smart Retries run
+  // (Dashboard → Revenue Recovery decides when to cancel, which arrives as
+  // customer.subscription.deleted). Anything else → no access.
+  const getAppStatus = (stripeStatus: string) =>
+    stripeStatus === "active" || stripeStatus === "trialing" || stripeStatus === "past_due" ? "active" : "inactive";
+
+  // API 2025-03-31.basil: period end lives on the subscription item, and the
+  // invoice → subscription link lives under invoice.parent.
+  const periodEndOf = (sub: Stripe.Subscription) => {
+    const end = sub.items?.data?.[0]?.current_period_end;
+    return end ? new Date(end * 1000).toISOString() : null;
+  };
+  const intervalOf = (sub: Stripe.Subscription) => {
+    const interval = sub.items?.data?.[0]?.price?.recurring?.interval;
+    return interval === "year" || interval === "month" ? interval : null;
+  };
+  const subscriptionIdOf = (invoice: Stripe.Invoice) => {
+    const ref = invoice.parent?.subscription_details?.subscription;
+    return typeof ref === "string" ? ref : ref?.id ?? null;
   };
 
   switch (event.type) {
@@ -45,6 +61,7 @@ export async function POST(request: NextRequest) {
         stripe_customer_id: session.customer as string,
         stripe_subscription_id: session.subscription as string,
         status: "active",
+        plan_interval: session.metadata?.plan_interval === "year" ? "year" : "month",
         updated_at: new Date().toISOString(),
       }, { onConflict: "user_id" });
       break;
@@ -78,7 +95,8 @@ export async function POST(request: NextRequest) {
         stripe_customer_id: sub.customer as string,
         stripe_subscription_id: sub.id,
         status,
-        current_period_end: new Date((sub as any).current_period_end * 1000).toISOString(),
+        current_period_end: periodEndOf(sub),
+        plan_interval: intervalOf(sub),
         updated_at: new Date().toISOString(),
       }, { onConflict: "user_id" });
       break;
@@ -88,7 +106,8 @@ export async function POST(request: NextRequest) {
       const invoice = event.data.object as Stripe.Invoice;
       if (invoice.billing_reason === "subscription_create") break; // Handled by checkout.session.completed
 
-      const subId = (invoice as any).subscription as string;
+      const subId = subscriptionIdOf(invoice);
+      if (!subId) break;
       const { data: subData } = await supabase
         .from("user_subscriptions")
         .select("user_id")
@@ -108,18 +127,11 @@ export async function POST(request: NextRequest) {
     }
 
     case "invoice.payment_failed": {
+      // Don't cut access here: Stripe Smart Retries will re-attempt over the next
+      // days and the subscription moves to past_due (still entitled). If every
+      // retry fails, Stripe cancels it and customer.subscription.deleted fires.
       const invoice = event.data.object as Stripe.Invoice;
-      const subId = (invoice as any).subscription as string;
-      
-      console.log(`[Stripe Webhook] Payment failed for sub: ${subId}. Cutting off access.`);
-
-      await supabase
-        .from("user_subscriptions")
-        .update({
-          status: "inactive",
-          updated_at: new Date().toISOString(),
-        })
-        .eq("stripe_subscription_id", subId);
+      console.log(`[Stripe Webhook] Payment failed for sub: ${subscriptionIdOf(invoice)} — awaiting Smart Retries.`);
       break;
     }
 

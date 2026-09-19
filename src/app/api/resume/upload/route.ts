@@ -1,10 +1,39 @@
 import { createClient } from "@/lib/supabase/server";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { getModelFallbackChain, parseResumeText } from "@/lib/ai";
-import type { AIModel } from "@/lib/ai/types";
-import { DEFAULT_MODEL } from "@/lib/ai/types";
-import { isPaidModel, userIsPremium } from "@/lib/subscription";
+import { normalizeModel } from "@/lib/ai/types";
+import { userIsPremium } from "@/lib/subscription";
 import { NextResponse } from "next/server";
 export const maxDuration = 60;
+
+// The browser extension uploads with a bearer token from a different origin.
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+};
+
+export async function OPTIONS() {
+  return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
+}
+
+// Website requests carry the Supabase session cookie; the extension sends
+// `Authorization: Bearer <access_token>` instead. Both resolve to the same user.
+async function resolveUser(request: Request) {
+  const bearer = request.headers.get("Authorization")?.replace("Bearer ", "").trim();
+  if (bearer) {
+    const supabase = createSupabaseClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      { global: { headers: { Authorization: `Bearer ${bearer}` } } }
+    );
+    const { data: { user } } = await supabase.auth.getUser(bearer);
+    return { supabase, user };
+  }
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  return { supabase, user };
+}
 
 const ACCEPTED_TYPES = [
   "application/pdf",
@@ -31,39 +60,35 @@ async function extractTextFromDOCX(buffer: Buffer): Promise<string> {
 
 export async function POST(request: Request) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const { supabase, user } = await resolveUser(request);
 
     if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: CORS_HEADERS });
     }
 
     const formData = await request.formData();
     const file = formData.get("file") as File | null;
 
     if (!file) {
-      return NextResponse.json({ error: "No file uploaded" }, { status: 400 });
+      return NextResponse.json({ error: "No file uploaded" }, { status: 400, headers: CORS_HEADERS });
     }
 
     if (!ACCEPTED_TYPES.includes(file.type)) {
       return NextResponse.json(
         { error: "Only PDF and Word documents (.pdf, .docx) are accepted" },
-        { status: 400 }
+        { status: 400, headers: CORS_HEADERS }
       );
     }
 
     if (file.size > 10 * 1024 * 1024) {
-      return NextResponse.json({ error: "File size must be under 10MB" }, { status: 400 });
+      return NextResponse.json({ error: "File size must be under 10MB" }, { status: 400, headers: CORS_HEADERS });
     }
 
-    const model = (formData.get("model") as AIModel | null) ?? DEFAULT_MODEL;
+    const model = normalizeModel(formData.get("model"));
 
     const isPremium = await userIsPremium(supabase, user.id, user.email);
-
-    if (isPaidModel(model) && !isPremium) {
-      return NextResponse.json({ error: "premium_required" }, { status: 402 });
+    if (!isPremium) {
+      return NextResponse.json({ error: "subscription_required" }, { status: 402, headers: CORS_HEADERS });
     }
 
     const isPDF = file.type === "application/pdf";
@@ -81,7 +106,7 @@ export async function POST(request: Request) {
 
     if (storageError) {
       console.error("Storage upload error:", storageError);
-      return NextResponse.json({ error: "Failed to upload file to storage" }, { status: 500 });
+      return NextResponse.json({ error: "Failed to upload file to storage" }, { status: 500, headers: CORS_HEADERS });
     }
 
     // Extract text
@@ -94,24 +119,24 @@ export async function POST(request: Request) {
       console.error("Text extraction error:", extractError);
       return NextResponse.json(
         { error: "Failed to extract text from file. Please ensure the file is a valid PDF or Word document." },
-        { status: 422 }
+        { status: 422, headers: CORS_HEADERS }
       );
     }
 
     if (!rawText || rawText.trim().length === 0) {
       return NextResponse.json(
         { error: "Could not extract any text from the file. The PDF may be image-based — try a Word document instead." },
-        { status: 422 }
+        { status: 422, headers: CORS_HEADERS }
       );
     }
 
-    // Parse with Claude AI
+    // Parse with the model fallback chain
     let parsedJson;
     try {
       parsedJson = await parseResumeText(rawText, model, getModelFallbackChain(model, isPremium));
     } catch (aiError) {
       console.error("AI parsing error:", aiError);
-      return NextResponse.json({ error: "Failed to analyze resume with AI. Please try again." }, { status: 500 });
+      return NextResponse.json({ error: "Failed to analyze resume with AI. Please try again." }, { status: 500, headers: CORS_HEADERS });
     }
 
     // Upsert into resume_data
@@ -128,12 +153,12 @@ export async function POST(request: Request) {
 
     if (dbError) {
       console.error("Database upsert error:", dbError);
-      return NextResponse.json({ error: "Failed to save resume data" }, { status: 500 });
+      return NextResponse.json({ error: "Failed to save resume data" }, { status: 500, headers: CORS_HEADERS });
     }
 
-    return NextResponse.json(parsedJson);
+    return NextResponse.json(parsedJson, { headers: CORS_HEADERS });
   } catch (error) {
     console.error("Resume upload error:", error);
-    return NextResponse.json({ error: "Failed to process resume" }, { status: 500 });
+    return NextResponse.json({ error: "Failed to process resume" }, { status: 500, headers: CORS_HEADERS });
   }
 }

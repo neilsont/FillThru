@@ -1,5 +1,6 @@
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
+import { userIsPremium } from "@/lib/subscription";
 import {
   dedupePendingQuestions,
   expandPendingQuestionIds,
@@ -34,6 +35,10 @@ export async function GET(request: NextRequest) {
     const { data: { user }, error } = await supabase.auth.getUser(token);
     if (error || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: CORS_HEADERS });
+    }
+
+    if (!(await userIsPremium(supabase, user.id, user.email))) {
+      return NextResponse.json({ error: "subscription_required" }, { status: 402, headers: CORS_HEADERS });
     }
 
     const { data, error: queryError } = await supabase
@@ -110,6 +115,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: CORS_HEADERS });
     }
 
+    if (!(await userIsPremium(supabase, user.id, user.email))) {
+      return NextResponse.json({ error: "subscription_required" }, { status: 402, headers: CORS_HEADERS });
+    }
+
     const { job_url, company, blocker_detail } = await request.json();
 
     await supabase.from("flagged_questions").insert({
@@ -146,6 +155,10 @@ export async function PATCH(request: NextRequest) {
 
     if (error || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: CORS_HEADERS });
+    }
+
+    if (!(await userIsPremium(supabase, user.id, user.email))) {
+      return NextResponse.json({ error: "subscription_required" }, { status: 402, headers: CORS_HEADERS });
     }
 
     const { id, ids, answer, field_key, question_text, saveToSupplemental = true } = await request.json();

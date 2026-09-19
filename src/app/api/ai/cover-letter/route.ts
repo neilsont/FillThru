@@ -3,7 +3,7 @@ import { generateCoverLetter, getModelFallbackChain } from "@/lib/ai";
 import type { ParsedResume } from "@/types/resume";
 import type { AIModel } from "@/lib/ai/types";
 import { DEFAULT_MODEL } from "@/lib/ai/types";
-import { isPaidModel, userIsPremium } from "@/lib/subscription";
+import { userIsPremium } from "@/lib/subscription";
 import { NextResponse, after } from "next/server";
 import { recordGeneration } from "@/lib/generations";
 
@@ -23,8 +23,9 @@ export async function POST(request: Request) {
     const requestedModel = model as AIModel;
     const isPremium = await userIsPremium(supabase, user.id, user.email);
 
-    if (isPaidModel(requestedModel) && !isPremium) {
-      return NextResponse.json({ error: "premium_required" }, { status: 402 });
+    // Every AI feature requires an active trial or subscription.
+    if (!isPremium) {
+      return NextResponse.json({ error: "subscription_required" }, { status: 402 });
     }
 
     // Fetch job

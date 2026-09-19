@@ -12,4 +12,26 @@ export function getStripe(): Stripe {
   return _stripe;
 }
 
-export const PREMIUM_PRICE_ID = process.env.STRIPE_PRICE_ID ?? "";
+export type PlanInterval = "month" | "year";
+
+// STRIPE_PRICE_ID is the legacy single (monthly) price; keep honoring it.
+export const PRICE_IDS: Record<PlanInterval, string> = {
+  month: process.env.STRIPE_PRICE_ID_MONTHLY ?? process.env.STRIPE_PRICE_ID ?? "",
+  year: process.env.STRIPE_PRICE_ID_YEARLY ?? "",
+};
+
+/** @deprecated use PRICE_IDS.month */
+export const PREMIUM_PRICE_ID = PRICE_IDS.month;
+
+export function parseInterval(value: unknown): PlanInterval {
+  return value === "year" ? "year" : "month";
+}
+
+export function getAppUrl(): string {
+  const url = process.env.NEXT_PUBLIC_APP_URL;
+  if (!url) {
+    if (process.env.NODE_ENV === "production") throw new Error("NEXT_PUBLIC_APP_URL is not set");
+    return "http://localhost:3000";
+  }
+  return url.replace(/\/$/, "");
+}
