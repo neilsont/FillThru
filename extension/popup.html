@@ -102,10 +102,22 @@
         <div id="composer-files" class="composer-files" hidden></div>
         <textarea id="ask-input" rows="1" placeholder="Ask Fillthru…" spellcheck="true"></textarea>
         <div class="ask-row">
-          <button id="ask-attach" class="btn-icon attach" type="button" title="Add a file — your résumé as PDF or Word">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          </button>
-          <input id="resume-file" type="file" accept=".pdf,.docx,.doc,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword" hidden />
+          <div class="attach-wrap">
+            <button id="ask-attach" class="btn-icon attach" type="button" title="Add" aria-haspopup="true" aria-expanded="false">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            </button>
+            <div id="attach-menu" class="menu menu-up" hidden>
+              <button class="menu-item menu-item-rich" type="button" data-pick="file">
+                <span class="menu-item-title">Add file</span>
+                <span class="menu-item-sub">Job description, notes, a draft — context for this chat</span>
+              </button>
+              <button class="menu-item menu-item-rich" type="button" data-pick="resume">
+                <span class="menu-item-title">Set my résumé</span>
+                <span class="menu-item-sub">Replaces the résumé on file</span>
+              </button>
+            </div>
+          </div>
+          <input id="resume-file" type="file" hidden />
           <span class="ask-hint">Uses your résumé + this page</span>
           <button id="ask-send" class="send" type="button" title="Send (Enter)" disabled>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>

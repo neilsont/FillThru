@@ -48,6 +48,12 @@ export async function POST(request: NextRequest) {
           .map((m: ChatMessage) => ({ role: m.role, content: m.content.slice(0, 4000) }))
       : [];
     const context: PageContext = body.context && typeof body.context === "object" ? body.context : {};
+    context.attachments = Array.isArray(context.attachments)
+      ? context.attachments
+          .filter((a) => a && typeof a.name === "string" && typeof a.text === "string")
+          .slice(0, 6)
+          .map((a) => ({ name: a.name.slice(0, 200), text: a.text.slice(0, 40_000) }))
+      : [];
     if (intent === "chat" && !messages.some((m) => m.role === "user")) {
       return NextResponse.json({ error: "Nothing to respond to" }, { status: 400, headers: CORS_HEADERS });
     }

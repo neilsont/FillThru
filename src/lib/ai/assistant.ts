@@ -20,7 +20,13 @@ export interface PageField {
   mappedField?: string | null;
 }
 
+export interface ChatAttachment {
+  name: string;
+  text: string;
+}
+
 export interface PageContext {
+  attachments?: ChatAttachment[];
   url?: string;
   title?: string;
   job?: { title?: string; company?: string; description?: string; url?: string } | null;
@@ -86,7 +92,8 @@ Rules:
 6. If the user asks to translate selected text or a passage, put the translation in "reply". If they ask to translate the whole page, emit translate_page.
 7. If the user asks about themselves ("do I have React experience?") answer from WHAT YOU KNOW; if it isn't there, say so and offer to remember it.
 8. Keep replies short. When you filled fields, say how many and what you still need. Never claim you filled something you didn't put in "fill".
-9. If there is no résumé and little known about the user, that's fine — work from what they tell you and remember it.`;
+9. If there is no résumé and little known about the user, that's fine — work from what they tell you and remember it.
+10. ATTACHED FILES are documents the user added to this conversation (a job description, a cover-letter draft, notes, a previous application…). Use them to answer, fill, and write. If an attachment is clearly a job posting and the page has none, treat it as the job posting. Attachments are not the user's résumé unless they say so.`;
 
 function describeFields(fields: PageField[] = []): string {
   if (!fields.length) return "(no fillable fields detected on this page)";
@@ -102,6 +109,19 @@ function describeFields(fields: PageField[] = []): string {
       return "- " + parts.join(" | ");
     })
     .join("\n");
+}
+
+function describeAttachments(attachments: ChatAttachment[] = []): string {
+  if (!attachments.length) return "";
+  let budget = 60_000;
+  const parts: string[] = [];
+  for (const a of attachments.slice(0, 6)) {
+    const text = (a.text || "").trim().slice(0, Math.max(0, Math.min(30_000, budget)));
+    budget -= text.length;
+    parts.push(`--- ${a.name} ---\n${text}${a.text.length > text.length ? "\n[…truncated]" : ""}`);
+    if (budget <= 0) break;
+  }
+  return "ATTACHED FILES:\n" + parts.join("\n\n");
 }
 
 function intentInstruction(intent: AssistantIntent): string {
@@ -153,6 +173,8 @@ export function buildAssistantPrompt(args: {
     "",
     "PAGE FIELDS:",
     describeFields(context.fields),
+    "",
+    describeAttachments(context.attachments),
     "",
     context.pendingQuestions?.length
       ? `PENDING QUESTIONS you asked last turn (map the user's answers to these ids):\n${context.pendingQuestions.map((q) => `- id=${q.id ?? "null"}: ${q.question}`).join("\n")}`

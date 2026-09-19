@@ -41,6 +41,7 @@ const askSend = $("ask-send");
 const askAttach = $("ask-attach");
 const resumeFile = $("resume-file");
 const composerFiles = $("composer-files");
+const attachMenu = $("attach-menu");
 const scrollArea = $("scroll");
 
 // ── Networking ──────────────────────────────────────────────────────────────
@@ -357,15 +358,17 @@ function resolveMessage(pending, text, { error = false } = {}) {
 }
 
 function fileKind(file) {
-  return /\.docx?$/i.test(file.name) || /wordprocessingml|msword/.test(file.type) ? "DOCX" : "PDF";
+  if (/\.docx?$/i.test(file.name) || /wordprocessingml|msword/.test(file.type)) return "DOCX";
+  if (/\.pdf$/i.test(file.name) || file.type === "application/pdf") return "PDF";
+  return "TXT";
 }
 
-function buildFileChip(file, { removable = false, onRemove = null } = {}) {
+function buildFileChip(file, { removable = false, onRemove = null, role = "file" } = {}) {
   const chip = document.createElement("div");
   chip.className = "file-chip";
   const kind = fileKind(file);
   const kb = Math.max(1, Math.round(file.size / 1024));
-  chip.innerHTML = `<span class="file-icon ${kind.toLowerCase()}">${kind}</span><span class="file-meta"><span class="file-name"></span><span class="file-sub">Résumé · ${kb} KB</span></span>`;
+  chip.innerHTML = `<span class="file-icon ${kind.toLowerCase()}">${kind}</span><span class="file-meta"><span class="file-name"></span><span class="file-sub">${role === "resume" ? "Résumé" : "File"} · ${kb} KB</span></span>`;
   chip.querySelector(".file-name").textContent = file.name;
   if (removable) {
     const x = document.createElement("button");
@@ -379,10 +382,10 @@ function buildFileChip(file, { removable = false, onRemove = null } = {}) {
   return chip;
 }
 
-function appendUserMessage({ text = "", file = null } = {}) {
+function appendUserMessage({ text = "", file = null, role = "file" } = {}) {
   const wrap = document.createElement("div");
   wrap.className = "msg msg-user";
-  if (file) wrap.appendChild(buildFileChip(file));
+  if (file) wrap.appendChild(buildFileChip(file, { role }));
   if (text) {
     const bubble = document.createElement("div");
     bubble.className = "bubble";
@@ -478,12 +481,14 @@ async function getPageContext({ includeFields = true } = {}) {
     selection: sel?.selection || "",
     language: sel?.language || "",
     pendingQuestions: pendingQuestions,
+    attachments: chatAttachments.map((a) => ({ name: a.name, text: a.text })),
   };
 }
 
 // ── The assistant loop ──────────────────────────────────────────────────────
 
 const chatHistory = [];       // [{ role, content }] shown in the thread this session
+const chatAttachments = [];   // [{ name, text }] files added to this conversation (never stored server-side)
 let pendingQuestions = [];    // [{ id, question }] the assistant asked last turn
 let turnInFlight = false;
 
@@ -864,14 +869,28 @@ async function submitAsk() {
   }
 
   // The file goes with the message, ChatGPT-style: chip + text in one user turn.
-  appendUserMessage({ text: question, file });
-  const summary = await uploadResume(file);
-  if (!summary) return; // upload error already shown
+  appendUserMessage({ text: question, file: file.file, role: file.role });
+
+  if (file.role === "resume") {
+    const summary = await uploadResume(file.file);
+    if (!summary) return; // error already shown
+    if (question) {
+      await runTurn({ intent: "chat", userMessage: `${question}\n(attached résumé: ${file.file.name} — now on file)`, alreadyRendered: true });
+    } else {
+      appendMessage("assistant", summary);
+      chatHistory.push({ role: "user", content: `(attached résumé: ${file.file.name})` }, { role: "assistant", content: summary });
+    }
+    return;
+  }
+
+  const extracted = await extractAttachment(file.file);
+  if (!extracted) return;
+  chatAttachments.push(extracted);
+  const note = `(attached file: ${extracted.name}${extracted.truncated ? ", long — first part only" : ""})`;
   if (question) {
-    await runTurn({ intent: "chat", userMessage: `${question}\n(attached résumé: ${file.name} — now on file)`, alreadyRendered: true });
+    await runTurn({ intent: "chat", userMessage: `${question}\n${note}`, alreadyRendered: true });
   } else {
-    appendMessage("assistant", summary);
-    chatHistory.push({ role: "user", content: `(attached résumé: ${file.name})` }, { role: "assistant", content: summary });
+    await runTurn({ intent: "chat", userMessage: `${note} What's in it, briefly, and how can you use it here?`, alreadyRendered: true });
   }
 }
 
@@ -888,12 +907,18 @@ askSend.addEventListener("click", submitAsk);
 // Picking a file parks it in the composer as a chip; it's uploaded when the
 // message is sent, and from then on it's context for every turn.
 
-let pendingFile = null;
+let pendingFile = null; // { file, role: "file" | "resume" }
+let pickRole = "file";
+
+const ACCEPT = {
+  file: ".pdf,.docx,.doc,.txt,.md,.csv,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword,text/plain,text/markdown,text/csv",
+  resume: ".pdf,.docx,.doc,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword",
+};
 
 function renderPendingFile() {
   composerFiles.replaceChildren();
   if (!pendingFile) { composerFiles.hidden = true; return; }
-  composerFiles.appendChild(buildFileChip(pendingFile, { removable: true, onRemove: () => { clearPendingFile(); autosizeAsk(); } }));
+  composerFiles.appendChild(buildFileChip(pendingFile.file, { role: pendingFile.role, removable: true, onRemove: () => { clearPendingFile(); autosizeAsk(); } }));
   composerFiles.hidden = false;
 }
 
@@ -903,22 +928,66 @@ function clearPendingFile() {
   renderPendingFile();
 }
 
-function openResumePicker() {
+function closeAttachMenu() {
+  attachMenu.hidden = true;
+  askAttach.setAttribute("aria-expanded", "false");
+}
+
+function openPicker(role) {
   closeMenu();
+  closeAttachMenu();
+  pickRole = role;
+  resumeFile.accept = ACCEPT[role];
   resumeFile.value = "";
   resumeFile.click();
 }
-askAttach.addEventListener("click", openResumePicker);
-menuUpload.addEventListener("click", openResumePicker);
+
+askAttach.addEventListener("click", (event) => {
+  event.stopPropagation();
+  const open = attachMenu.hidden;
+  attachMenu.hidden = !open;
+  askAttach.setAttribute("aria-expanded", String(open));
+});
+attachMenu.addEventListener("click", (event) => {
+  const item = event.target.closest("[data-pick]");
+  if (item) openPicker(item.dataset.pick);
+});
+document.addEventListener("click", (event) => {
+  if (!attachMenu.hidden && !attachMenu.contains(event.target)) closeAttachMenu();
+});
+menuUpload.addEventListener("click", () => openPicker("resume"));
 
 resumeFile.addEventListener("change", () => {
   const file = resumeFile.files?.[0];
   if (!file) return;
-  pendingFile = file;
+  pendingFile = { file, role: pickRole };
   renderPendingFile();
   autosizeAsk();
   askInput.focus();
 });
+
+// Extracts an attachment's text for this conversation; returns { name, text, truncated } or null.
+async function extractAttachment(file) {
+  const token = await getValidToken();
+  if (!token) return null;
+  const pending = appendMessage("assistant", `Reading ${file.name}…`, { thinking: true });
+  try {
+    const form = new FormData();
+    form.append("file", file);
+    const { payload } = await fetchCareerLaunch("/api/extension/attachments", {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${token}` },
+      body: form,
+    }, { fallbackMessage: "Couldn't read that file", timeoutMs: 90000, timeoutMessage: "Reading the file took too long. Please try again." });
+    pending.wrap.remove();
+    const data = payload.data || {};
+    return { name: data.name || file.name, text: data.text || "", truncated: Boolean(data.truncated) };
+  } catch (err) {
+    if (err?.status !== 402) resolveMessage(pending, err.message || "Couldn't read that file.", { error: true });
+    else pending.wrap.remove();
+    return null;
+  }
+}
 
 // Uploads + parses the résumé; returns a one-line summary or null on failure.
 async function uploadResume(file) {
@@ -973,6 +1042,7 @@ menuClear.addEventListener("click", () => {
   closeMenu();
   askThread.replaceChildren();
   chatHistory.length = 0;
+  chatAttachments.length = 0;
   pendingQuestions = [];
   clearPendingFile();
 });

@@ -4,6 +4,7 @@ import { getModelFallbackChain, parseResumeText } from "@/lib/ai";
 import { normalizeModel } from "@/lib/ai/types";
 import { userIsPremium } from "@/lib/subscription";
 import { NextResponse } from "next/server";
+import { DOCUMENT_TYPES, extractTextFromDOCX, extractTextFromPDF } from "@/lib/documents";
 export const maxDuration = 60;
 
 // The browser extension uploads with a bearer token from a different origin.
@@ -35,28 +36,7 @@ async function resolveUser(request: Request) {
   return { supabase, user };
 }
 
-const ACCEPTED_TYPES = [
-  "application/pdf",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  "application/msword",
-];
-
-async function extractTextFromPDF(buffer: Buffer): Promise<string> {
-  const { extractText, getDocumentProxy } = await import("unpdf");
-  const pdf = await getDocumentProxy(new Uint8Array(buffer));
-  const { text } = await extractText(pdf, { mergePages: true });
-  return text.trim();
-}
-
-async function extractTextFromDOCX(buffer: Buffer): Promise<string> {
-  // mammoth is CJS — use require() so Turbopack skips static analysis
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const mammoth = require("mammoth") as {
-    extractRawText: (opts: { buffer: Buffer }) => Promise<{ value: string }>;
-  };
-  const result = await mammoth.extractRawText({ buffer });
-  return result.value.trim();
-}
+const ACCEPTED_TYPES: string[] = [...DOCUMENT_TYPES.pdf, ...DOCUMENT_TYPES.docx];
 
 export async function POST(request: Request) {
   try {

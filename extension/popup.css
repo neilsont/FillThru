@@ -83,6 +83,11 @@ body {
 .menu-item:hover { background: var(--hover); }
 .menu-item[hidden] { display: none; }
 .menu-sep { height: 1px; background: var(--border); margin: 6px 4px; }
+.menu-up { top: auto; bottom: 34px; right: auto; left: 0; min-width: 250px; }
+.menu-item-rich { display: flex; flex-direction: column; gap: 1px; padding: 8px 10px; }
+.menu-item-title { font-size: 13px; font-weight: 600; color: var(--text); }
+.menu-item-sub { font-size: 11px; color: var(--slate); line-height: 1.35; }
+.attach-wrap { position: relative; }
 .menu-note { padding: 6px 10px 8px; font-size: 11px; color: var(--muted); }
 .menu-note[hidden] { display: none; }
 
@@ -326,6 +331,7 @@ body {
   flex-shrink: 0;
 }
 .file-chip .file-icon.docx { background: #2b579a; }
+.file-chip .file-icon.txt { background: #6b7280; }
 .file-chip .file-meta { display: flex; flex-direction: column; min-width: 0; }
 .file-chip .file-name { font-size: 13px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px; }
 .file-chip .file-sub { font-size: 11px; color: var(--slate); }
