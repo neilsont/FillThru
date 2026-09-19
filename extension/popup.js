@@ -875,8 +875,34 @@ async function saveJobToCareerLaunch(token, jobInfo, filledFields = null) {
 
 const STAGE_LABELS = { discovered: "Saved", in_progress: "In progress", applied: "Applied", interviewing: "Interviewing", rejected: "Rejected", offer: "Offer" };
 
+const STAGE_WORD = { in_progress: "in progress", applied: "applied", interviewing: "interviewing", rejected: "rejected", offer: "offer" };
+
+// "Save this job" on a My Applications page = import the whole list.
+async function importApplicationsFromPage(token) {
+  const collected = await relayToContent({ type: "CL_COLLECT_APPLICATIONS" });
+  if (!collected?.found) return null;
+  const { payload } = await fetchCareerLaunch("/api/extension/import-applications", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+    body: JSON.stringify({ url: collected.url, company: collected.company, sections: collected.sections, links: collected.links }),
+  }, { fallbackMessage: "Couldn't import the applications", timeoutMs: 60000, timeoutMessage: "Importing took too long. Please try again." });
+  const data = payload.data || {};
+  const items = data.items || [];
+  if (!items.length) return "I found the applications section but couldn't read any rows from it. If the list is empty that's expected — otherwise tell me the job titles and I'll add them.";
+  const counts = {};
+  for (const it of items) counts[it.status] = (counts[it.status] || 0) + 1;
+  const breakdown = Object.entries(counts).map(([s, n]) => `${n} ${STAGE_WORD[s] || s}`).join(", ");
+  const company = items[0]?.company || collected.company || "this site";
+  const lines = items.slice(0, 12).map((it) => `• ${it.title} — ${STAGE_LABELS[it.status] || it.status}`).join("\n");
+  return `Imported ${items.length} application${items.length === 1 ? "" : "s"} from ${company} (${breakdown}).\n${lines}${items.length > 12 ? `\n…and ${items.length - 12} more` : ""}\n\nThey're in your Applications now — tell me when any of them change.`;
+}
+
 async function saveCurrentJob(token, given = null) {
   let info = await getJobInfo();
+  if (!info?.title && !given?.title && (lastPageKind === "workday_home" || lastPageKind === "applications_list")) {
+    const imported = await importApplicationsFromPage(token);
+    if (imported) return imported;
+  }
   if ((!info?.title || !info?.url) && given?.title) {
     const tab = await getTabInfo().catch(() => null);
     info = { title: given.title, company: given.company || "", location: given.location || "", description: given.description || "", url: given.url || tab?.url || "" };

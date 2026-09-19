@@ -746,16 +746,94 @@
     return { ok: true, changed: filled };
   }
 
+  // ── "My Applications" pages (Workday candidate home etc.) ─────────────────
+  // Collects the applications section's text per tab (clicking Inactive if it's
+  // not showing) plus any job links, for the server to turn into tracker rows.
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  function findApplicationsSection() {
+    const byId = document.querySelector('[data-automation-id*="pplication" i]');
+    const heading = Array.from(document.querySelectorAll("h1, h2, h3, h4, [role='heading']"))
+      .find((h) => /my applications|applied jobs|your applications/i.test(h.textContent || ""));
+    let node = heading?.closest("section, article, div[data-automation-id], div[class*='section' i], div[class*='container' i]") || byId?.closest("section, div") || heading?.parentElement;
+    // Walk up until the container holds more than just the heading.
+    while (node && node !== document.body && (node.innerText || "").trim().length < 80) node = node.parentElement;
+    return node || null;
+  }
+
+  function sectionText(node) {
+    const clone = node.cloneNode(true);
+    clone.querySelectorAll(`script, style, svg, nav, #${OVERLAY_ROOT_ID}`).forEach((el) => el.remove());
+    return (clone.innerText || clone.textContent || "").replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim().slice(0, 12000);
+  }
+
+  function sectionLinks(node) {
+    return Array.from(node.querySelectorAll("a[href]"))
+      .map((a) => ({ title: (a.textContent || "").trim().slice(0, 200), href: a.href }))
+      .filter((l) => l.title.length > 2 && !/^(view|apply|details?|more)$/i.test(l.title))
+      .slice(0, 100);
+  }
+
+  function companyFromPage() {
+    const meta = document.querySelector('meta[property="og:site_name"]')?.content || document.querySelector('meta[name="application-name"]')?.content;
+    if (meta && !/workday/i.test(meta)) return meta.trim();
+    const logoAlt = document.querySelector('header img[alt], [data-automation-id="logoImage"] img[alt], a[href="/"] img[alt]')?.alt;
+    if (logoAlt && !/logo|workday/i.test(logoAlt)) return logoAlt.trim();
+    const fromTitle = (document.title.match(/(?:careers?|jobs?)\s+(?:at|@)\s+([^|–-]+)/i) || [])[1];
+    if (fromTitle) return fromTitle.trim();
+    // Workday tenant slug, e.g. /en-US/REC_RTX_Ext_Gateway → RTX
+    const seg = location.pathname.split("/").find((p) => /_/.test(p) && /[A-Za-z]/.test(p));
+    if (seg) {
+      const part = seg.split("_").find((w) => /^[A-Z][A-Z0-9&]{1,}$/.test(w) && !/^(REC|EXT|INT|CAREERS?|JOBS?|GATEWAY|EXTERNAL|INTERNAL|SITE)$/i.test(w));
+      if (part) return part;
+    }
+    return "";
+  }
+
+  async function collectApplications() {
+    const section = findApplicationsSection();
+    if (!section) return { found: false };
+    const tabs = Array.from(section.querySelectorAll("[role='tab'], button, a"))
+      .filter((el) => /^(active|inactive|current|past|archived)\b/i.test((el.textContent || "").trim()));
+    const sections = [];
+    const links = new Map();
+    const grab = (label) => {
+      sections.push({ tab: label, text: sectionText(section) });
+      for (const l of sectionLinks(section)) links.set(l.title.toLowerCase(), l);
+    };
+    if (tabs.length < 2) {
+      grab("Applications");
+    } else {
+      const current = tabs.find((t) => t.getAttribute("aria-selected") === "true" || /selected|active/.test(t.className)) || tabs[0];
+      for (const tab of tabs) {
+        if (tab !== current) { tab.click(); await sleep(900); }
+        grab((tab.textContent || "").trim().replace(/\s*\(\d+\)\s*$/, ""));
+      }
+      if (current) { current.click(); await sleep(300); }
+    }
+    return {
+      found: true,
+      url: location.href,
+      company: companyFromPage(),
+      sections,
+      links: Array.from(links.values()),
+    };
+  }
+
   // What a page is when it isn't a job posting — so the assistant can say so.
   function describePageKind() {
     const host = location.hostname;
     const path = location.pathname;
     if (/myworkdayjobs\.com|myworkdaysite\.com/.test(host)) {
+      if (/\/job\//.test(path)) return "unknown"; // a posting
       if (/userHome/i.test(path)) return "workday_home";
       if (/\/apply|\/task\//i.test(path)) return "workday_application";
       return "workday_search";
     }
     if (/indeed\.com/.test(host) && /\/jobs/.test(path)) return "search_results";
+    if (/linkedin\.com/.test(host) && /my-items|applied/.test(location.href)) return "applications_list";
+    if (/indeed\.com/.test(host) && /myjobs/.test(path)) return "applications_list";
+    if (findApplicationsSection()) return "applications_list";
     if (/linkedin\.com/.test(host) && /\/jobs\/(search|collections)/.test(path)) return "search_results";
     return "unknown";
   }
@@ -845,6 +923,8 @@
   // Handles Indeed's split-panel layout, Indeed Apply modal, and generic pages
 
   function extractJobInfo() {
+    // Pages that list applications or search results aren't postings.
+    if (describePageKind() !== "unknown") return null;
     const host = window.location.hostname;
     const isIndeed = host.includes("indeed.com");
 
@@ -1774,6 +1854,11 @@
 
     if (message.type === "CL_INSERT_AT_FOCUS") {
       sendResponse(insertAtFocus(message.text || ""));
+      return true;
+    }
+
+    if (message.type === "CL_COLLECT_APPLICATIONS") {
+      collectApplications().then(sendResponse).catch((err) => sendResponse({ found: false, error: err.message }));
       return true;
     }
 
