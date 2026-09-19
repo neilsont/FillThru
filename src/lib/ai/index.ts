@@ -1,5 +1,5 @@
 import type { AIModel } from "./types";
-import { AI_MODELS, DEFAULT_MODEL, normalizeModel } from "./types";
+import { AI_MODELS, DEFAULT_MODEL, getModelConfig, normalizeModel } from "./types";
 import type { ParsedResume } from "@/types/resume";
 import type { FieldMapping } from "@/types/application";
 
@@ -54,7 +54,8 @@ async function openaiCompatChat(
   model: string,
   systemPrompt: string,
   userPrompt: string,
-  maxTokens = 1024
+  maxTokens = 1024,
+  extra: Record<string, unknown> = {}
 ): Promise<string> {
   const OpenAI = (await import("openai")).default;
   const client = new OpenAI({ apiKey, baseURL });
@@ -65,17 +66,18 @@ async function openaiCompatChat(
       { role: "system", content: systemPrompt },
       { role: "user", content: userPrompt },
     ],
+    ...extra, // provider-specific fields such as OpenRouter's `reasoning`
   });
   return res.choices[0]?.message?.content?.trim() ?? "";
 }
 
-async function anthropicChat(systemPrompt: string, userPrompt: string, maxTokens = 1024): Promise<string> {
+async function anthropicChat(modelName: string, systemPrompt: string, userPrompt: string, maxTokens = 1024): Promise<string> {
   const Anthropic = (await import("@anthropic-ai/sdk")).default;
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY is not set");
   const client = new Anthropic({ apiKey });
   const res = await client.messages.create({
-    model: "claude-haiku-4-5-20251001",
+    model: modelName,
     max_tokens: maxTokens,
     system: systemPrompt,
     messages: [{ role: "user", content: userPrompt }],
@@ -91,35 +93,40 @@ async function geminiChat(modelName: string, systemPrompt: string, userPrompt: s
   const key = process.env.GOOGLE_AI_STUDIO_API_KEY || process.env.GEMINI_API_KEY;
   if (!key) throw new Error("GOOGLE_AI_STUDIO_API_KEY (or GEMINI_API_KEY) is not set");
   const genAI = new GoogleGenerativeAI(key);
+  // Gemini 3.5 Flash thinks before answering and its thinking counts toward
+  // maxOutputTokens, so give it headroom rather than the caller's text budget.
   const m = genAI.getGenerativeModel({
     model: modelName,
     systemInstruction: systemPrompt,
-    generationConfig: { maxOutputTokens: maxTokens },
+    generationConfig: { maxOutputTokens: Math.max(maxTokens * 4, 8192) },
   });
   const result = await m.generateContent(userPrompt);
   return result.response.text().trim();
 }
 
+const OPENAI_COMPAT: Record<string, { baseURL: string; envKey: string }> = {
+  groq: { baseURL: "https://api.groq.com/openai/v1", envKey: "GROQ_AI_API_KEY" },
+  openrouter: { baseURL: "https://openrouter.ai/api/v1", envKey: "OPEN_ROUTER_API_KEY" },
+  openai: { baseURL: "https://api.openai.com/v1", envKey: "OPENAI_API_KEY" },
+};
+
 async function chat(model: AIModel, systemPrompt: string, userPrompt: string, maxTokens = 1024): Promise<string> {
-  switch (model) {
-    case "gemini-3.5-flash-lite":
-      return geminiChat("gemini-3.5-flash-lite", systemPrompt, userPrompt, maxTokens);
-    case "gemini-3.5-flash":
-      return geminiChat("gemini-3.5-flash", systemPrompt, userPrompt, maxTokens);
-    case "openrouter/deepseek-v4-flash": {
-      const key = process.env.OPEN_ROUTER_API_KEY;
-      if (!key) throw new Error("OPEN_ROUTER_API_KEY is not set");
-      return openaiCompatChat(key, "https://openrouter.ai/api/v1", "deepseek/deepseek-v4-flash-0731:free", systemPrompt, userPrompt, maxTokens);
+  const config = getModelConfig(model);
+  switch (config.provider) {
+    case "google":
+      return geminiChat(config.remoteId, systemPrompt, userPrompt, maxTokens);
+    case "anthropic":
+      return anthropicChat(config.remoteId, systemPrompt, userPrompt, maxTokens);
+    case "groq":
+    case "openrouter":
+    case "openai": {
+      const { baseURL, envKey } = OPENAI_COMPAT[config.provider];
+      const key = process.env[envKey];
+      if (!key) throw new Error(`${envKey} is not set`);
+      return openaiCompatChat(key, baseURL, config.remoteId, systemPrompt, userPrompt, maxTokens, config.requestOptions ?? {});
     }
-    case "gpt-4o-mini": {
-      const key = process.env.OPENAI_API_KEY;
-      if (!key) throw new Error("OPENAI_API_KEY is not set");
-      return openaiCompatChat(key, "https://api.openai.com/v1", "gpt-4o-mini", systemPrompt, userPrompt, maxTokens);
-    }
-    case "claude-haiku-4-5-20251001":
-      return anthropicChat(systemPrompt, userPrompt, maxTokens);
     default:
-      throw new Error(`Unknown model: ${model}`);
+      throw new Error(`Unknown provider for model: ${model}`);
   }
 }
 

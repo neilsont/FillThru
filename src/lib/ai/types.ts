@@ -1,29 +1,42 @@
 export type AIModel =
   | "gemini-3.5-flash-lite"
   | "openrouter/deepseek-v4-flash"
+  | "openrouter/nemotron-3-super"
+  | "openrouter/nemotron-3-ultra"
   | "gemini-3.5-flash"
   | "gpt-4o-mini"
   | "claude-haiku-4-5-20251001";
 
+export type AIProvider = "groq" | "openrouter" | "google" | "openai" | "anthropic";
+
 export interface AIModelConfig {
   id: AIModel;
   name: string;
-  provider: "groq" | "openrouter" | "google" | "openai" | "anthropic";
+  provider: AIProvider;
+  /** The model id the provider's API expects. */
+  remoteId: string;
   providerLabel: string;
   description: string;
   badge: string;
   badgeVariant: "default" | "secondary" | "outline";
   color: string;
   free: boolean;
+  /** Extra request-body fields for OpenAI-compatible providers (e.g. OpenRouter's reasoning controls). */
+  requestOptions?: Record<string, unknown>;
 }
 
 // Order matters: the free fallback chain runs top-to-bottom.
-// Verified live 2026-09-18 — see git history for the retired Groq/Qwen entries.
+// Adding an OpenRouter model = one entry here. Probe it first with a strict-JSON
+// prompt; reasoning models need requestOptions.reasoning.enabled=false or their
+// hidden thinking eats the max_tokens budget and the JSON gets cut off.
+// Verified live 2026-09-19 — see git history for retired entries (Groq llama-3.3,
+// Qwen 3.6 Plus free, DeepSeek V4.1 Flash free).
 export const AI_MODELS: AIModelConfig[] = [
   {
     id: "gemini-3.5-flash-lite",
     name: "Gemini 3.5 Flash-Lite",
     provider: "google",
+    remoteId: "gemini-3.5-flash-lite",
     providerLabel: "Google AI Studio",
     description: "Google's fastest model on the AI Studio free tier. Great for resume parsing, answers, and cover letters.",
     badge: "Free",
@@ -32,20 +45,36 @@ export const AI_MODELS: AIModelConfig[] = [
     free: true,
   },
   {
-    id: "openrouter/deepseek-v4-flash",
-    name: "DeepSeek V4 Flash",
+    id: "openrouter/nemotron-3-ultra",
+    name: "Nemotron 3 Ultra",
     provider: "openrouter",
+    remoteId: "nvidia/nemotron-3-ultra-550b-a55b:free",
     providerLabel: "OpenRouter",
-    description: "DeepSeek's flash model on OpenRouter's free community tier (rate-limited).",
+    description: "NVIDIA's largest open model, free on OpenRouter (rate-limited). Strong writing.",
     badge: "Free",
     badgeVariant: "default",
-    color: "bg-purple-500",
+    color: "bg-lime-700",
     free: true,
+    requestOptions: { reasoning: { enabled: false } },
+  },
+  {
+    id: "openrouter/nemotron-3-super",
+    name: "Nemotron 3 Super",
+    provider: "openrouter",
+    remoteId: "nvidia/nemotron-3-super-120b-a12b:free",
+    providerLabel: "OpenRouter",
+    description: "NVIDIA's 120B model, fast and free on OpenRouter (rate-limited).",
+    badge: "Free",
+    badgeVariant: "default",
+    color: "bg-lime-600",
+    free: true,
+    requestOptions: { reasoning: { enabled: false } },
   },
   {
     id: "gemini-3.5-flash",
     name: "Gemini 3.5 Flash",
     provider: "google",
+    remoteId: "gemini-3.5-flash",
     providerLabel: "Google AI Studio",
     description: "Higher quality than Flash-Lite, a few seconds slower. Same free tier.",
     badge: "Free",
@@ -54,9 +83,22 @@ export const AI_MODELS: AIModelConfig[] = [
     free: true,
   },
   {
+    id: "openrouter/deepseek-v4-flash",
+    name: "DeepSeek V4 Flash",
+    provider: "openrouter",
+    remoteId: "deepseek/deepseek-v4-flash-0731:free",
+    providerLabel: "OpenRouter",
+    description: "DeepSeek's flash model on OpenRouter's free community tier (rate-limited).",
+    badge: "Free",
+    badgeVariant: "default",
+    color: "bg-purple-500",
+    free: true,
+  },
+  {
     id: "gpt-4o-mini",
     name: "GPT-4o Mini",
     provider: "openai",
+    remoteId: "gpt-4o-mini",
     providerLabel: "OpenAI",
     description: "OpenAI's efficient model. Requires OpenAI billing/credits.",
     badge: "Billing req.",
@@ -68,6 +110,7 @@ export const AI_MODELS: AIModelConfig[] = [
     id: "claude-haiku-4-5-20251001",
     name: "Claude Haiku",
     provider: "anthropic",
+    remoteId: "claude-haiku-4-5-20251001",
     providerLabel: "Anthropic",
     description: "Anthropic's fastest model. Requires Anthropic API credits.",
     badge: "Billing req.",
@@ -88,6 +131,12 @@ const LEGACY_MODEL_ALIASES: Record<string, AIModel> = {
   "gemini-2.5-flash": "gemini-3.5-flash",
   "gemini-2.5-flash-lite": "gemini-3.5-flash-lite",
 };
+
+export function getModelConfig(model: AIModel): AIModelConfig {
+  const config = AI_MODELS.find((m) => m.id === model);
+  if (!config) throw new Error(`Unknown model: ${model}`);
+  return config;
+}
 
 export function isKnownModel(model: unknown): model is AIModel {
   return typeof model === "string" && AI_MODELS.some((m) => m.id === model);
