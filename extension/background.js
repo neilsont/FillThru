@@ -36,7 +36,7 @@ function showNotification(alert) {
   chrome.notifications.create({
     type: "basic",
     iconUrl: "icons/icon48.png",
-    title: "Applyr — Action Required",
+    title: "Fillthru — Action Required",
     message: alert.blocker_detail ?? "A job application needs your attention",
     priority: 1,
   });
@@ -204,7 +204,7 @@ async function runAutopilotStep(tabId) {
     await setAutopilotState({ active: true, paused: true, pauseReason: "blocker", currentStep: "paused" });
     chrome.notifications.create({
       type: "basic", iconUrl: "icons/icon48.png",
-      title: "Applyr Autopilot Paused",
+      title: "Fillthru Autopilot Paused",
       message: `Manual action required: ${pageState.blockerType || "blocker detected"}. Open the extension to resume.`,
       priority: 2,
     });
@@ -230,7 +230,7 @@ async function runAutopilotStep(tabId) {
       });
       chrome.notifications.create({
         type: "basic", iconUrl: "icons/icon48.png",
-        title: "Applyr Autopilot Paused",
+        title: "Fillthru Autopilot Paused",
         message: `Need ${autofillResult.skippedFields.length} answer(s) to continue. Open the extension.`,
         priority: 2,
       });
@@ -290,7 +290,7 @@ async function advanceAutopilotToNextJob(tabId, state, appliedCount) {
     setActionBadge("", null);
     chrome.notifications.create({
       type: "basic", iconUrl: "icons/icon48.png",
-      title: "Applyr Autopilot Complete",
+      title: "Fillthru Autopilot Complete",
       message: `Applied to ${appliedCount} job${appliedCount !== 1 ? "s" : ""}. Check your dashboard.`,
     });
     return;

@@ -1217,18 +1217,18 @@
     const button = document.createElement("button");
     button.className = "btn";
     button.type = "button";
-    button.setAttribute("aria-label", "Open Applyr assistant");
+    button.setAttribute("aria-label", "Open Fillthru assistant");
     button.innerHTML = ROCKET_SVG;
     button.addEventListener("click", () => setPanelOpen(!launcher.open));
 
     const tip = document.createElement("div");
     tip.className = "tip";
-    tip.innerHTML = `<span>Ask Applyr</span><kbd>${SHORTCUT_LABEL}</kbd>`;
+    tip.innerHTML = `<span>Ask Fillthru</span><kbd>${SHORTCUT_LABEL}</kbd>`;
 
     const panel = document.createElement("div");
     panel.className = "panel";
     const frame = document.createElement("iframe");
-    frame.setAttribute("title", "Applyr assistant");
+    frame.setAttribute("title", "Fillthru assistant");
     frame.setAttribute("allow", "clipboard-write");
     panel.appendChild(frame);
 

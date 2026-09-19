@@ -70,7 +70,7 @@ export function PlanCard() {
             ? `Everything is included. ${status?.currentPeriodEnd ? `Renews ${new Date(status.currentPeriodEnd).toLocaleDateString()}.` : ""}`
             : trialing
               ? "You have full access during your trial. Subscribe any time to keep it — you won't be charged until the trial ends."
-              : "Subscribe to keep using the Applyr extension: form filling, answers, cover letters, and Autopilot."}
+              : "Subscribe to keep using the Fillthru extension: form filling, answers, cover letters, and Autopilot."}
         </CardDescription>
       </CardHeader>
       <CardContent>

@@ -1,4 +1,4 @@
-# Chrome Web Store listing — Applyr
+# Chrome Web Store listing — Fillthru
 
 Paste-ready copy for the Developer Dashboard. Keep in sync with `manifest.json`.
 
@@ -8,7 +8,7 @@ Build the upload zip with `npm run extension:package` → `build/careerlaunch-ex
 
 ## Store listing tab
 
-**Name:** Applyr
+**Name:** Fillthru
 
 **Summary:** taken from `description` in `manifest.json` (132 chars max) — not editable in the dashboard.
 
@@ -18,26 +18,26 @@ Build the upload zip with `npm run extension:package` → `build/careerlaunch-ex
 
 **Description:**
 
-Applyr is an in-page assistant that fills out forms, answers application questions, and writes cover letters using the profile and résumé you already built at Applyr. It works on any website — not just job boards.
+Fillthru is an in-page assistant that fills out forms, answers application questions, and writes cover letters using the profile and résumé you already built at Fillthru. It works on any website — not just job boards.
 
 How it works:
 1. Sign in once with Google. You stay signed in on this browser.
-2. On any page, click the Applyr icon or press Option+C (Alt+C on Windows). A small rocket button appears in the bottom-right corner.
+2. On any page, click the Fillthru icon or press Option+C (Alt+C on Windows). A small rocket button appears in the bottom-right corner.
 3. Click the rocket to open the assistant and pick an action, or type a question.
 
 What it can do:
 • Fill out this form — fills everything it knows from your résumé and saved answers, then asks you in the chat for anything it doesn't know. Answer once and it remembers for next time.
 • Write a cover letter — reads the job posting and writes a tailored letter; asks you if it needs more to go on.
-• Save this job — one click to add the posting to your Applyr tracker.
+• Save this job — one click to add the posting to your Fillthru tracker.
 • Translate this page — the whole page, on-device with Chrome's built-in translator, so nothing leaves your computer. Or select any text and ask "translate this".
-• Ask Applyr — a chat that understands the page: "fill in the salary question with 120k", "do I have React experience?", "find me part-time frontend jobs in Austin", "apply to these".
+• Ask Fillthru — a chat that understands the page: "fill in the salary question with 120k", "do I have React experience?", "find me part-time frontend jobs in Austin", "apply to these".
 • Add your résumé with the + button, right in the chat.
-• Optional Autopilot from the chat: queue Indeed results and Applyr fills and submits them, pausing to ask you whenever a form needs an answer it doesn't have.
+• Optional Autopilot from the chat: queue Indeed results and Fillthru fills and submits them, pausing to ask you whenever a form needs an answer it doesn't have.
 • Manual mode never submits — you review and click submit yourself.
 
-Your data stays yours. The extension only reads a page when you use it, only talks to Applyr servers, and does not sell or share your information.
+Your data stays yours. The extension only reads a page when you use it, only talks to Fillthru servers, and does not sell or share your information.
 
-A free Applyr account is required: https://careerlaunch1.vercel.app
+A free Fillthru account is required: https://careerlaunch1.vercel.app
 
 **Official URL / Homepage:** https://careerlaunch1.vercel.app
 **Support URL:** https://careerlaunch1.vercel.app
@@ -58,7 +58,7 @@ Screenshot ideas: (1) popup signed-in state on a Greenhouse form, (2) a form mid
 ## Privacy practices tab
 
 **Single purpose description:**
-Auto-fill job application forms on any website using the user's saved Applyr profile and résumé data.
+Auto-fill job application forms on any website using the user's saved Fillthru profile and résumé data.
 
 ### Permission justifications
 
@@ -78,7 +78,7 @@ Job application forms are frequently embedded in iframes (Greenhouse, Lever, Ind
 Autopilot runs in the background across several tabs. Desktop notifications tell the user when it pauses because a form needs their input, or when the queued applications are complete.
 
 **identity**
-Used for Google sign-in via `chrome.identity.launchWebAuthFlow`, so the user can authenticate with the same account they use on the Applyr website.
+Used for Google sign-in via `chrome.identity.launchWebAuthFlow`, so the user can authenticate with the same account they use on the Fillthru website.
 
 **clipboardWrite**
 Lets the user copy an AI-generated answer to a screening question from the popup and paste it into a field the auto-fill couldn't reach.
@@ -92,12 +92,12 @@ Job applications live on thousands of different domains — every company's own 
 
 Check these under "What user data do you plan to collect?":
 - ☑ Personally identifiable information (name, email, phone, address — the user's own profile, used to fill forms)
-- ☑ Authentication information (session token for the Applyr account)
+- ☑ Authentication information (session token for the Fillthru account)
 - ☐ Personal communications — **leave unchecked**
 - ☐ Location — **leave unchecked** (address is PII, not geolocation)
 - ☐ Web history — **leave unchecked**
 - ☐ User activity — **leave unchecked**
-- ☐ Website content — check **only if** job-posting extraction is considered "collection" (it sends job title/company/description to Applyr when the user saves a job). Safer to check it and explain.
+- ☐ Website content — check **only if** job-posting extraction is considered "collection" (it sends job title/company/description to Fillthru when the user saves a job). Safer to check it and explain.
 
 Certify all three:
 - ☑ I do not sell or transfer user data to third parties, outside of the approved use cases

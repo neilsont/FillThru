@@ -3,7 +3,7 @@ import { DEFAULT_MODEL } from "./types";
 import { chatWithFallback, stripCodeFences } from "./index";
 import type { ParsedResume } from "@/types/resume";
 
-// ─── The in-page assistant ("Ask Applyr") ─────────────────────────────────────
+// ─── The in-page assistant ("Ask Fillthru") ─────────────────────────────────────
 // One model turn = one JSON object. The extension executes `fill` / `actions`,
 // shows `reply`, and keeps `ask` around so the user's next message can be
 // mapped back to the fields the assistant was asking about.
@@ -40,6 +40,9 @@ export type AssistantAction =
   | { type: "write_cover_letter"; notes?: string }
   | { type: "search_jobs"; keywords?: string; location?: string; jobTypes?: string[] }
   | { type: "start_autopilot"; keywords?: string; location?: string; jobTypes?: string[]; limit?: number }
+  | { type: "pause_autopilot" }
+  | { type: "resume_autopilot" }
+  | { type: "stop_autopilot" }
   | { type: "translate_page"; target?: string }
   | { type: "insert_text"; text: string };
 
@@ -53,7 +56,7 @@ export interface AssistantTurn {
 
 export type AssistantIntent = "chat" | "fill_form" | "cover_letter";
 
-const SYSTEM = `You are Applyr, an assistant that lives inside a browser extension and helps people fill out job applications and other web forms.
+const SYSTEM = `You are Fillthru, an assistant that lives inside a browser extension and helps people fill out job applications and other web forms.
 You always answer with ONE JSON object and nothing else — no markdown, no code fences, no commentary outside the JSON.
 
 JSON shape:
@@ -70,6 +73,7 @@ Actions you may emit:
   { "type": "write_cover_letter", "notes": string }        — generate a cover letter for the job on this page; notes = anything the user told you to emphasise
   { "type": "search_jobs", "keywords": string, "location": string, "jobTypes": ["fulltime"|"parttime"|"contract"|"temporary"|"internship"] }
   { "type": "start_autopilot", "keywords": string, "location": string, "jobTypes": [...], "limit": number } — auto-apply to matching jobs (only when the user clearly asks to apply automatically)
+  { "type": "pause_autopilot" } / { "type": "resume_autopilot" } / { "type": "stop_autopilot" } — when the user says pause / resume / stop (Autopilot runs silently in the background otherwise)
   { "type": "translate_page", "target": "en" }             — translate the whole page into a language code
   { "type": "insert_text", "text": string }                — put text into the field the user last clicked
 

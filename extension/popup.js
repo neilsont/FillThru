@@ -1,5 +1,5 @@
-// Applyr Browser Extension — assistant panel
-// Runs inside the iframe that content.js injects. Talks to the Applyr API with a
+// Fillthru Browser Extension — assistant panel
+// Runs inside the iframe that content.js injects. Talks to the Fillthru API with a
 // Supabase bearer token and to the page through the background relay.
 
 const DEFAULT_BASE_URL = "https://careerlaunch1.vercel.app";
@@ -35,7 +35,6 @@ const btnAutofill = $("btn-autofill");
 const btnCoverLetter = $("btn-cover-letter");
 const btnSaveJob = $("btn-save-job");
 const btnTranslate = $("btn-translate");
-const pageHost = $("page-host");
 const askThread = $("ask-thread");
 const askInput = $("ask-input");
 const askSend = $("ask-send");
@@ -119,7 +118,7 @@ async function fetchCareerLaunch(path, init = {}, options = {}) {
   if (lastResponse && lastPayload) {
     throw buildResponseError(lastResponse, lastPayload, options.fallbackMessage || "Request failed");
   }
-  throw lastError || new Error(options.fallbackMessage || "Could not reach Applyr");
+  throw lastError || new Error(options.fallbackMessage || "Could not reach Fillthru");
 }
 
 async function relayToContent(payload) {
@@ -150,7 +149,7 @@ async function generateCodeChallenge(verifier) {
 
 async function signInWithGoogle() {
   if (!chrome.identity) {
-    throw new Error("Extension needs to be reloaded. Go to chrome://extensions and click the reload button on Applyr.");
+    throw new Error("Extension needs to be reloaded. Go to chrome://extensions and click the reload button on Fillthru.");
   }
   const codeVerifier = generateCodeVerifier();
   const codeChallenge = await generateCodeChallenge(codeVerifier);
@@ -269,7 +268,7 @@ function showPaywallView(entitlement) {
   menuUpload.hidden = true;
   menuPlan.hidden = true;
   $("paywall-title").textContent =
-    entitlement?.reason === "trial_expired" ? "Your free trial has ended" : "Subscribe to use Applyr";
+    entitlement?.reason === "trial_expired" ? "Your free trial has ended" : "Subscribe to use Fillthru";
 }
 
 function renderPlanNote(entitlement) {
@@ -299,18 +298,8 @@ function showMainView(profileData) {
   btnLogout.hidden = false;
   menuUpload.hidden = false;
   renderPlanNote(entitlement);
-  updatePageInfo();
-  restoreAutopilotStatus();
+  watchAutopilot();
   askInput.focus();
-}
-
-async function updatePageInfo() {
-  try {
-    const info = await getTabInfo();
-    pageHost.textContent = info?.url ? `On ${new URL(info.url).hostname}` : "";
-  } catch {
-    pageHost.textContent = "";
-  }
 }
 
 async function init() {
@@ -561,6 +550,9 @@ async function runAction(action, token) {
     }
     case "search_jobs": return searchJobs(action);
     case "start_autopilot": return startAutopilot(token, action);
+    case "pause_autopilot":
+    case "resume_autopilot":
+    case "stop_autopilot": return controlAutopilot(action.type, token);
     default: return "";
   }
 }
@@ -657,37 +649,11 @@ async function searchJobs(action) {
   return "Opened Indeed in a new tab. When you're on the results, open me there and say \"apply to these\" to start Autopilot.";
 }
 
-// ── Autopilot (driven from chat) ────────────────────────────────────────────
+// ── Autopilot (driven from chat, silent otherwise) ──────────────────────────
+// No status card: the assistant only speaks up when Autopilot needs an answer
+// or when it finishes. "pause" / "resume" / "stop" in the chat control it.
 
-const autopilot = { message: null, poll: null, awaitingSupplemental: false };
-
-function autopilotStatusMessage() {
-  if (autopilot.message?.wrap.isConnected) return autopilot.message;
-  const msg = appendMessage("assistant", "Autopilot starting…");
-  const actions = document.createElement("div");
-  actions.className = "answer-actions";
-  const pause = makeButton("btn btn-secondary", "Pause", async () => {
-    const { state } = await chrome.runtime.sendMessage({ type: "CL_AUTOPILOT_STATUS" });
-    if (state?.paused) {
-      const token = await getValidToken();
-      await resumeAutopilot(token);
-      pause.textContent = "Pause";
-    } else {
-      await chrome.runtime.sendMessage({ type: "CL_AUTOPILOT_PAUSE" });
-      pause.textContent = "Resume";
-    }
-  });
-  const stop = makeButton("btn btn-secondary", "Stop", async () => {
-    await chrome.runtime.sendMessage({ type: "CL_AUTOPILOT_STOP" });
-    stopAutopilotPolling();
-    msg.bubble.textContent = "Autopilot stopped.";
-    actions.remove();
-  });
-  actions.append(pause, stop);
-  msg.wrap.appendChild(actions);
-  autopilot.message = msg;
-  return msg;
-}
+const autopilot = { poll: null, awaitingSupplemental: false, announcedDone: false };
 
 function stopAutopilotPolling() {
   if (autopilot.poll) clearInterval(autopilot.poll);
@@ -701,37 +667,56 @@ async function resumeAutopilot(token) {
 }
 
 async function pollAutopilot() {
-  const { state } = await chrome.runtime.sendMessage({ type: "CL_AUTOPILOT_STATUS" });
-  const msg = autopilotStatusMessage();
+  let state;
+  try { ({ state } = await chrome.runtime.sendMessage({ type: "CL_AUTOPILOT_STATUS" })); }
+  catch { return; }
+
   if (!state?.active) {
     stopAutopilotPolling();
-    msg.bubble.textContent = `Autopilot finished — applied to ${state?.appliedCount ?? 0} job${state?.appliedCount === 1 ? "" : "s"}. Check your dashboard for details.`;
-    msg.wrap.querySelector(".answer-actions")?.remove();
-    autopilot.message = null;
+    if (!autopilot.announcedDone && state?.appliedCount) {
+      autopilot.announcedDone = true;
+      appendMessage("assistant", `Autopilot finished — applied to ${state.appliedCount} job${state.appliedCount === 1 ? "" : "s"}. Details are on your dashboard.`);
+    }
     return;
   }
-  const total = state.jobQueue?.length || 0;
-  const applied = state.appliedCount || 0;
-  const current = state.jobQueue?.[state.currentIndex];
-  const currentLabel = current ? `${current.title} at ${current.company}` : "…";
 
-  if (state.paused && state.pauseReason === "missing_supplemental" && state.pendingSupplemental?.length) {
-    msg.bubble.textContent = `Autopilot paused (${applied}/${total} done) — I need a few answers to continue.`;
-    if (!autopilot.awaitingSupplemental) {
-      autopilot.awaitingSupplemental = true;
-      const qs = state.pendingSupplemental.map((f) => ({
-        id: `supp:${f.fieldName}`,
-        question: f.options?.length ? `${f.pageLabel} (options: ${f.options.join(", ")})` : f.pageLabel,
-      }));
-      pendingQuestions = qs;
-      appendMessage("assistant", "To keep applying I need:\n" + qs.map((q, i) => `${i + 1}. ${q.question}`).join("\n") + "\n\nJust answer here and I'll save them and resume.");
-      chatHistory.push({ role: "assistant", content: "I need: " + qs.map((q) => q.question).join("; ") });
-    }
-  } else if (state.paused) {
-    msg.bubble.textContent = `Autopilot paused (${applied}/${total} done).`;
-  } else {
-    msg.bubble.textContent = `Autopilot: applying to ${currentLabel} (${applied}/${total}).`;
+  if (state.paused && state.pauseReason === "missing_supplemental" && state.pendingSupplemental?.length && !autopilot.awaitingSupplemental) {
+    autopilot.awaitingSupplemental = true;
+    const qs = state.pendingSupplemental.map((f) => ({
+      id: `supp:${f.fieldName}`,
+      question: f.options?.length ? `${f.pageLabel} (options: ${f.options.join(", ")})` : f.pageLabel,
+    }));
+    pendingQuestions = qs;
+    const applied = state.appliedCount || 0;
+    const total = state.jobQueue?.length || 0;
+    appendMessage("assistant", `Autopilot needs a few answers to keep going (${applied}/${total} done):\n` + qs.map((q, i) => `${i + 1}. ${q.question}`).join("\n") + "\n\nAnswer here and I'll save them and continue.");
+    chatHistory.push({ role: "assistant", content: "Autopilot needs: " + qs.map((q) => q.question).join("; ") });
   }
+}
+
+function watchAutopilot() {
+  stopAutopilotPolling();
+  autopilot.announcedDone = false;
+  autopilot.poll = setInterval(pollAutopilot, 3000);
+  pollAutopilot();
+}
+
+async function controlAutopilot(action, token) {
+  const { state } = await chrome.runtime.sendMessage({ type: "CL_AUTOPILOT_STATUS" });
+  if (!state?.active) return "Autopilot isn't running right now.";
+  const applied = state.appliedCount || 0;
+  const total = state.jobQueue?.length || 0;
+  if (action === "pause_autopilot") {
+    await chrome.runtime.sendMessage({ type: "CL_AUTOPILOT_PAUSE" });
+    return `Paused Autopilot at ${applied}/${total}. Say "resume" when you're ready.`;
+  }
+  if (action === "resume_autopilot") {
+    await resumeAutopilot(token);
+    return `Resuming Autopilot (${applied}/${total} done).`;
+  }
+  await chrome.runtime.sendMessage({ type: "CL_AUTOPILOT_STOP" });
+  stopAutopilotPolling();
+  return `Stopped Autopilot after ${applied} application${applied === 1 ? "" : "s"}.`;
 }
 
 async function startAutopilot(token, action = {}) {
@@ -765,22 +750,8 @@ async function startAutopilot(token, action = {}) {
     profile: profileData.profile,
     supplemental: profileData.supplemental,
   });
-  autopilotStatusMessage().bubble.textContent = `Autopilot starting — ${Math.min(limit, scan.jobs.length)} jobs queued.`;
-  stopAutopilotPolling();
-  autopilot.poll = setInterval(pollAutopilot, 3000);
-  return "";
-}
-
-async function restoreAutopilotStatus() {
-  try {
-    const { state } = await chrome.runtime.sendMessage({ type: "CL_AUTOPILOT_STATUS" });
-    if (state?.active) {
-      autopilotStatusMessage();
-      stopAutopilotPolling();
-      autopilot.poll = setInterval(pollAutopilot, 3000);
-      pollAutopilot();
-    }
-  } catch { /* background not ready */ }
+  watchAutopilot();
+  return `Autopilot started on ${Math.min(limit, scan.jobs.length)} jobs. I'll only check in if I need an answer, or say "pause" / "stop" any time.`;
 }
 
 // ── Quick actions ───────────────────────────────────────────────────────────
@@ -937,7 +908,6 @@ menuClear.addEventListener("click", () => {
   askThread.replaceChildren();
   chatHistory.length = 0;
   pendingQuestions = [];
-  autopilot.message = null;
 });
 
 btnHide.addEventListener("click", async () => {
