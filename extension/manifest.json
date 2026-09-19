@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Fillthru",
-  "version": "1.3.1",
+  "version": "1.3.2",
   "description": "Fill out forms, answer application questions, and write cover letters from your Fillthru profile — on any site.",
   "icons": {
     "16": "icons/icon16.png",
@@ -62,7 +62,6 @@
   ],
   "permissions": [
     "storage",
-    "activeTab",
     "scripting",
     "webNavigation",
     "notifications",

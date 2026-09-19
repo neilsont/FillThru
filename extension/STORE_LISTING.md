@@ -73,9 +73,6 @@ Auto-fill job application forms on any website using the user's saved Fillthru p
 **storage**
 Stores the user's sign-in session token and cached profile locally so they don't have to log in every time the popup opens.
 
-**activeTab**
-Lets the popup read the current tab's URL and form fields when the user clicks Auto-fill, so we can fill the application the user is looking at.
-
 **scripting**
 Injects the form-filling logic into the job application page (including application iframes) only when the user presses Auto-fill or starts an Autopilot run.
 
