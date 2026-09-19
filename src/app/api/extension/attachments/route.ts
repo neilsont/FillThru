@@ -52,28 +52,32 @@ export async function POST(request: NextRequest) {
     const kind = detectDocumentKind(file);
     if (!kind) {
       return NextResponse.json(
-        { error: "I can read PDF, Word, and plain-text files (.txt, .md, .csv). Images aren't supported yet." },
+        { error: "I can read PDF, Word, plain-text files (.txt, .md, .csv), and images (PNG, JPG, WebP, HEIC)." },
         { status: 415, headers: CORS_HEADERS }
       );
     }
 
     let text: string;
+    let ocr = false;
     try {
-      text = await extractDocumentText(kind, Buffer.from(await file.arrayBuffer()));
+      ({ text, ocr } = await extractDocumentText(kind, Buffer.from(await file.arrayBuffer()), file));
     } catch (extractError) {
       console.error("Attachment extraction error:", extractError);
-      return NextResponse.json({ error: "Couldn't read that file. Is it a valid PDF or Word document?" }, { status: 422, headers: CORS_HEADERS });
+      const message = extractError instanceof Error && /too large/i.test(extractError.message)
+        ? extractError.message
+        : "Couldn't read that file. Is it a valid PDF, Word document, or image?";
+      return NextResponse.json({ error: message }, { status: 422, headers: CORS_HEADERS });
     }
     if (!text) {
       return NextResponse.json(
-        { error: "That file has no readable text — if it's a scanned PDF, try a text version." },
+        { error: "I couldn't find any readable text in that file." },
         { status: 422, headers: CORS_HEADERS }
       );
     }
 
     const truncated = text.length > MAX_CHARS;
     return NextResponse.json(
-      { name: file.name, kind, chars: text.length, truncated, text: truncated ? text.slice(0, MAX_CHARS) : text },
+      { name: file.name, kind, ocr, chars: text.length, truncated, text: truncated ? text.slice(0, MAX_CHARS) : text },
       { headers: CORS_HEADERS }
     );
   } catch (err) {

@@ -381,13 +381,15 @@ chrome.runtime.onInstalled.addListener(() => {
 
 // ── Action (Icon Click) ───────────────────────────────────────────────────
 
-async function summonAssistant(tab) {
+// mode "step": first call shows the button, next opens the chat (⌥F).
+// mode "open": show the button and open the chat in one go (toolbar icon).
+async function summonAssistant(tab, mode = "open") {
   // If the browser UI can't be injected (e.g. chrome:// or edge:// pages), skip
   if (!tab?.id || !tab.url || tab.url.startsWith("chrome://") || tab.url.startsWith("edge://")) return;
 
+  const message = { type: "CL_TOGGLE_OVERLAY", mode };
   try {
-    // Send message to content script to toggle the assistant panel
-    await chrome.tabs.sendMessage(tab.id, { type: "CL_TOGGLE_OVERLAY" });
+    await chrome.tabs.sendMessage(tab.id, message);
   } catch (err) {
     // Content script might not be injected yet. Inject it and retry.
     if (err.message.includes("Could not establish connection") || err.message.includes("Receiving end does not exist")) {
@@ -397,13 +399,13 @@ async function summonAssistant(tab) {
       });
       // Wait a bit for initialization
       setTimeout(() => {
-        chrome.tabs.sendMessage(tab.id, { type: "CL_TOGGLE_OVERLAY" }).catch(() => {});
+        chrome.tabs.sendMessage(tab.id, message).catch(() => {});
       }, 200);
     }
   }
 }
 
-chrome.action.onClicked.addListener(summonAssistant);
+chrome.action.onClicked.addListener((tab) => summonAssistant(tab, "open"));
 
 // Chrome binds suggested_key only on first install and silently skips
 // conflicts. If ⌥C didn't get bound, send the user to the one place it can be set.
@@ -411,7 +413,7 @@ chrome.runtime.onInstalled.addListener(async ({ reason }) => {
   if (reason !== "install" && reason !== "update") return;
   try {
     const commands = await chrome.commands.getAll();
-    const toggle = commands.find((c) => c.name === "toggle-assistant");
+    const toggle = commands.find((c) => c.name === "fillthru-open");
     if (toggle && !toggle.shortcut) {
       chrome.tabs.create({ url: "chrome://extensions/shortcuts" });
     }
@@ -420,11 +422,11 @@ chrome.runtime.onInstalled.addListener(async ({ reason }) => {
   }
 });
 
-// ⌥C opens / ⌥X closes — see "commands" in manifest.json
+// ⌥F: show button → open chat. ⌥X: close chat → hide button. See manifest "commands".
 chrome.commands.onCommand.addListener(async (command, tab) => {
   if (!tab) [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (command === "toggle-assistant") return summonAssistant(tab);
-  if (command === "close-assistant" && tab?.id) {
+  if (command === "fillthru-open") return summonAssistant(tab, "step");
+  if (command === "fillthru-close" && tab?.id) {
     chrome.tabs.sendMessage(tab.id, { type: "CL_CLOSE_ASSISTANT" }).catch(() => {});
   }
 });

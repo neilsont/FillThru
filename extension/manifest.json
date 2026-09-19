@@ -17,19 +17,19 @@
     "default_title": "Fillthru"
   },
   "commands": {
-    "toggle-assistant": {
+    "fillthru-open": {
       "suggested_key": {
-        "default": "Alt+C",
-        "mac": "Alt+C"
+        "default": "Alt+Shift+F",
+        "mac": "Alt+F"
       },
-      "description": "Open the Fillthru assistant"
+      "description": "Show Fillthru; press again to open the chat"
     },
-    "close-assistant": {
+    "fillthru-close": {
       "suggested_key": {
-        "default": "Alt+X",
+        "default": "Alt+Shift+X",
         "mac": "Alt+X"
       },
-      "description": "Close the Fillthru assistant"
+      "description": "Close the chat; press again to hide Fillthru"
     }
   },
   "background": {

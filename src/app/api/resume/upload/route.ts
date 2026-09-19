@@ -4,7 +4,7 @@ import { getModelFallbackChain, parseResumeText } from "@/lib/ai";
 import { normalizeModel } from "@/lib/ai/types";
 import { userIsPremium } from "@/lib/subscription";
 import { NextResponse } from "next/server";
-import { DOCUMENT_TYPES, extractTextFromDOCX, extractTextFromPDF } from "@/lib/documents";
+import { detectDocumentKind, extractDocumentText } from "@/lib/documents";
 export const maxDuration = 60;
 
 // The browser extension uploads with a bearer token from a different origin.
@@ -36,8 +36,6 @@ async function resolveUser(request: Request) {
   return { supabase, user };
 }
 
-const ACCEPTED_TYPES: string[] = [...DOCUMENT_TYPES.pdf, ...DOCUMENT_TYPES.docx];
-
 export async function POST(request: Request) {
   try {
     const { supabase, user } = await resolveUser(request);
@@ -53,9 +51,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "No file uploaded" }, { status: 400, headers: CORS_HEADERS });
     }
 
-    if (!ACCEPTED_TYPES.includes(file.type)) {
+    const kind = detectDocumentKind(file);
+    if (!kind || kind === "text") {
       return NextResponse.json(
-        { error: "Only PDF and Word documents (.pdf, .docx) are accepted" },
+        { error: "Please upload your résumé as a PDF, Word document, or image (PNG/JPG)." },
         { status: 400, headers: CORS_HEADERS }
       );
     }
@@ -71,8 +70,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "subscription_required" }, { status: 402, headers: CORS_HEADERS });
     }
 
-    const isPDF = file.type === "application/pdf";
-    const ext = isPDF ? "pdf" : "docx";
+    const ext = kind === "pdf" ? "pdf" : kind === "docx" ? "docx" : (file.name.split(".").pop()?.toLowerCase() || "png");
     const buffer = Buffer.from(await file.arrayBuffer());
     const filePath = `${user.id}/resume.${ext}`;
 
@@ -89,23 +87,21 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Failed to upload file to storage" }, { status: 500, headers: CORS_HEADERS });
     }
 
-    // Extract text
+    // Extract text (scanned PDFs and images are transcribed by Gemini)
     let rawText: string;
     try {
-      rawText = isPDF
-        ? await extractTextFromPDF(buffer)
-        : await extractTextFromDOCX(buffer);
+      ({ text: rawText } = await extractDocumentText(kind, buffer, file));
     } catch (extractError) {
       console.error("Text extraction error:", extractError);
       return NextResponse.json(
-        { error: "Failed to extract text from file. Please ensure the file is a valid PDF or Word document." },
+        { error: "Failed to read the file. Please make sure it's a valid PDF, Word document, or image." },
         { status: 422, headers: CORS_HEADERS }
       );
     }
 
     if (!rawText || rawText.trim().length === 0) {
       return NextResponse.json(
-        { error: "Could not extract any text from the file. The PDF may be image-based — try a Word document instead." },
+        { error: "I couldn't find any readable text in that file." },
         { status: 422, headers: CORS_HEADERS }
       );
     }

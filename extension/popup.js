@@ -246,6 +246,8 @@ async function fetchProfile(token) {
   const { payload } = await fetchCareerLaunch("/api/extension/profile", {
     headers: { "Authorization": `Bearer ${token}` },
   }, { fallbackMessage: "Could not fetch profile" });
+  // Cached so the next page shows the chat instantly instead of a sign-in flash.
+  chrome.storage.local.set({ profile_cache: { data: payload.data, at: Date.now() } });
   return payload.data;
 }
 
@@ -287,25 +289,36 @@ function renderPlanNote(entitlement) {
   }
 }
 
-function showMainView(profileData) {
+function showMainView(profileData, { quiet = false } = {}) {
   cachedProfile = profileData;
   const entitlement = profileData?.entitlement;
   if (entitlement && !entitlement.active) {
     showPaywallView(entitlement);
     return;
   }
+  const alreadyShowing = viewMain.style.display === "flex";
   viewLogin.style.display = "none";
   viewPaywall.style.display = "none";
   viewMain.style.display = "flex";
   btnLogout.hidden = false;
   menuUpload.hidden = false;
   renderPlanNote(entitlement);
-  watchAutopilot();
-  askInput.focus();
+  if (!alreadyShowing) {
+    watchAutopilot();
+    askInput.focus();
+  }
+  void quiet;
 }
 
 async function init() {
-  const { user_email } = await getStoredAuth();
+  const { user_email, access_token } = await getStoredAuth();
+
+  // Signed in before? Paint the last known state immediately, then refresh.
+  if (access_token) {
+    const { profile_cache } = await chrome.storage.local.get("profile_cache");
+    if (profile_cache?.data) showMainView(profile_cache.data, { quiet: true });
+  }
+
   let token = null;
   try { token = await getValidToken(); } catch { token = null; }
 
@@ -360,6 +373,7 @@ function resolveMessage(pending, text, { error = false } = {}) {
 function fileKind(file) {
   if (/\.docx?$/i.test(file.name) || /wordprocessingml|msword/.test(file.type)) return "DOCX";
   if (/\.pdf$/i.test(file.name) || file.type === "application/pdf") return "PDF";
+  if (/\.(png|jpe?g|webp|heic|heif|gif)$/i.test(file.name) || file.type.startsWith("image/")) return "IMG";
   return "TXT";
 }
 
@@ -910,9 +924,10 @@ askSend.addEventListener("click", submitAsk);
 let pendingFile = null; // { file, role: "file" | "resume" }
 let pickRole = "file";
 
+const IMAGE_ACCEPT = ".png,.jpg,.jpeg,.webp,.heic,.heif,.gif,image/*";
 const ACCEPT = {
-  file: ".pdf,.docx,.doc,.txt,.md,.csv,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword,text/plain,text/markdown,text/csv",
-  resume: ".pdf,.docx,.doc,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword",
+  file: `.pdf,.docx,.doc,.txt,.md,.csv,${IMAGE_ACCEPT},application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword,text/plain,text/markdown,text/csv`,
+  resume: `.pdf,.docx,.doc,${IMAGE_ACCEPT},application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword`,
 };
 
 function renderPendingFile() {
@@ -1094,6 +1109,7 @@ btnLogin.addEventListener("click", async () => {
 btnLogout.addEventListener("click", async () => {
   closeMenu();
   await clearAuth();
+  await chrome.storage.local.remove("profile_cache");
   cachedProfile = null;
   showLoginView();
 });

@@ -1042,7 +1042,7 @@
   // user hides it; the panel itself toggles.
   const OVERLAY_ROOT_ID = "cl-overlay-root";
   const IS_MAC = /Mac|iPhone|iPad/.test(navigator.platform);
-  const SHORTCUT_LABEL = IS_MAC ? "⌥C" : "Alt+C";
+  const SHORTCUT_LABEL = IS_MAC ? "⌥F" : "Alt+Shift+F";
   const ROCKET_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09"/><path d="M9 12a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.4 22.4 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 .05 5 .05"/></svg>`;
 
   let launcher = null; // { host, panel, button, open }
@@ -1093,17 +1093,26 @@
     return launcher;
   }
 
-  // Toolbar icon / ⌥C: summon the launcher if needed and open the panel.
-  // ⌥X (or Esc, or the × in the panel) closes it.
-  async function toggleOverlay() {
+  // "step" (⌥F): no launcher → show the button; button → open the chat; open → focus it.
+  // "open" (toolbar icon): show the button and open the chat in one go.
+  async function toggleOverlay(mode = "open") {
     if (!syncLauncherReference()) {
       injectLauncher();
-      // Next frame so the panel's open transition actually plays on first summon.
-      requestAnimationFrame(() => setPanelOpen(true));
+      if (mode === "open") {
+        // Next frame so the panel's open transition actually plays on first summon.
+        requestAnimationFrame(() => setPanelOpen(true));
+      }
       return;
     }
     if (launcher.open) launcher.frame.focus();
     else setPanelOpen(true);
+  }
+
+  // ⌥X / Esc / ×: chat open → close it; chat closed → hide Fillthru on this page.
+  function closeStep() {
+    if (!syncLauncherReference()) return;
+    if (launcher.open) setPanelOpen(false);
+    else removeOverlay();
   }
 
   function setPanelOpen(open) {
@@ -1116,6 +1125,10 @@
       // Lazy-load the panel document on first open.
       if (!launcher.frame.src) launcher.frame.src = chrome.runtime.getURL("popup.html");
       launcher.frame.focus();
+    } else {
+      // Hand focus back to the page so the next ⌥X reaches our page handler.
+      launcher.frame.blur();
+      window.focus();
     }
   }
 
@@ -1389,15 +1402,17 @@
   // event.code ignores the "ç"/"≈" the OS would type for Option+C / Option+X.
   window.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && launcher?.open) { setPanelOpen(false); return; }
-    if (!event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
-    if (event.code === "KeyC") {
+    if (!event.altKey || event.ctrlKey || event.metaKey) return;
+    // Mac: ⌥F / ⌥X. Elsewhere Alt+F opens the browser menu, so Alt+Shift is the default there;
+    // both spellings are accepted everywhere.
+    if (event.code === "KeyF") {
       event.preventDefault();
       event.stopPropagation();
-      toggleOverlay();
-    } else if (event.code === "KeyX" && launcher?.open) {
+      toggleOverlay("step");
+    } else if (event.code === "KeyX" && launcher) {
       event.preventDefault();
       event.stopPropagation();
-      setPanelOpen(false);
+      closeStep();
     }
   }, true);
 
@@ -1663,12 +1678,12 @@
     }
 
     if (message.type === "CL_TOGGLE_OVERLAY") {
-      toggleOverlay().then(() => sendResponse({ ok: true }));
+      toggleOverlay(message.mode || "open").then(() => sendResponse({ ok: true }));
       return true;
     }
 
     if (message.type === "CL_CLOSE_ASSISTANT") {
-      if (launcher?.open) setPanelOpen(false);
+      closeStep();
       sendResponse({ ok: true });
       return true;
     }
