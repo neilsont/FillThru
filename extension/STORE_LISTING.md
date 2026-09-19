@@ -18,26 +18,34 @@ Build the upload zip with `npm run extension:package` → `build/careerlaunch-ex
 
 **Description:**
 
-Fillthru is an in-page assistant that fills out forms, answers application questions, and writes cover letters using the profile and resume you already built at Fillthru. It works on any website — not just job boards.
+Fillthru is an in-page assistant that fills out job applications for you — from your resume, from what you tell it, and from what's on your screen. It works on any website: Greenhouse, Lever, Workday, Ashby, iCIMS, LinkedIn, Indeed, and every company's own careers site.
 
-How it works:
+How it works
 1. Sign in once with Google. You stay signed in on this browser.
-2. On any page, click the Fillthru icon or press Option+C (Alt+C on Windows). A small rocket button appears in the bottom-right corner.
-3. Click the rocket to open the assistant and pick an action, or type a question.
+2. On any page, press Option+F (Alt+Shift+F on Windows) or click the Fillthru icon. A small rocket button appears in the corner — press again or click it to open the chat.
+3. Pick an action, or just type what you need.
 
-What it can do:
-• Fill out this form — fills everything it knows from your resume and saved answers, then asks you in the chat for anything it doesn't know. Answer once and it remembers for next time.
-• Write a cover letter — reads the job posting and writes a tailored letter; asks you if it needs more to go on.
-• Save this job — one click to add the posting to your Fillthru tracker.
-• Translate this page — the whole page, on-device with Chrome's built-in translator, so nothing leaves your computer. Or select any text and ask "translate this".
-• Ask Fillthru — a chat that understands the page: "fill in the salary question with 120k", "do I have React experience?", "find me part-time frontend jobs in Austin", "apply to these".
-• Add your resume with the + button, right in the chat.
-• Optional Autopilot from the chat: queue Indeed results and Fillthru fills and submits them, pausing to ask you whenever a form needs an answer it doesn't have.
-• Manual mode never submits — you review and click submit yourself.
+What it can do
+• Fill out this form — fills everything it knows from your resume and saved answers, then asks you in the chat for anything it doesn't. Answer once and it remembers for next time.
+• Write a cover letter — reads the job posting (even from another tab) and writes a tailored letter; asks if it needs more to go on.
+• Save this job — one click adds the posting to your Applications tracker. On a careers site's "My Applications" page (like Workday's candidate home) it imports every application, active and inactive, with the right status.
+• Translate this page — the whole page, on your device with Chrome's built-in translator. Or select any text and ask "translate this".
+• Ask Fillthru — a chat that understands the page. "Do I have React experience?", "fill in the salary question with 120k", "find me part-time frontend jobs in Austin", "I just submitted this one".
+• Add files with + — your resume (PDF, Word, or even a photo of it), a job description, a screenshot, notes. They become context for the conversation.
+• Works across tabs — a job description open in one tab is used to fill the application in another.
+• Chat history — every conversation is saved to your account. Reopen one in any tab, move it between tabs, or clear it.
+• Optional Autopilot — from the chat, queue Indeed results and Fillthru fills and submits them, pausing to ask whenever a form needs an answer it doesn't have.
+• No resume required — tell it about yourself as you go and it builds up what it knows.
 
-Your data stays yours. The extension only reads a page when you use it, only talks to Fillthru servers, and does not sell or share your information.
+Manual mode never submits an application — you review and click submit yourself.
 
-A free Fillthru account is required: https://fillthru.com
+Your data stays yours. The extension only reads a page when you use it, never in the background. It talks only to Fillthru's servers, and your information is never sold or shared.
+
+Pricing
+Every new account gets a 7-day free trial with everything included — no card required. After that, Fillthru is $14.99/month or $99/year, cancel any time.
+
+A Fillthru account is required: https://fillthru.com
+Privacy policy: https://fillthru.com/privacy
 
 **Official URL / Homepage:** https://fillthru.com
 **Support URL:** https://fillthru.com
