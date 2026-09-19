@@ -19,7 +19,7 @@ const faqs: { category: string; items: { q: string; a: string }[] }[] = [
       },
       {
         q: "Is CareerLaunch free to use?",
-        a: "Yes. The core features — job tracking, resume parsing, cover letter generation, and browser extension auto-fill — are all free using our free-tier AI models (Llama 3.3 70B and Qwen 3.6 Plus). A Premium subscription ($9.99/month) unlocks access to advanced AI models including GPT-4o Mini, Gemini 2.0 Flash, and Claude Haiku.",
+        a: "You get a 7-day free trial with everything included — the browser extension, form filling, AI answers, cover letters, and Autopilot — no card required. After the trial, a monthly or yearly subscription keeps everything running. See your Profile page for current pricing.",
       },
       {
         q: "What browsers does the extension support?",
@@ -95,23 +95,27 @@ const faqs: { category: string; items: { q: string; a: string }[] }[] = [
     ],
   },
   {
-    category: "AI Models & Premium",
+    category: "Plans & Billing",
     items: [
       {
-        q: "What's the difference between free and premium AI models?",
-        a: "Free models (Llama 3.3 70B via Groq, Qwen 3.6 Plus via OpenRouter) are fully capable for most resume parsing and cover letter tasks. Premium models (GPT-4o Mini, Gemini 2.0 Flash, Claude Haiku) are more powerful, may produce higher-quality output, and are better for complex or nuanced writing tasks.",
+        q: "What happens when my free trial ends?",
+        a: "The extension and AI features pause until you subscribe. Your résumé, saved jobs, and answers stay in your account, so subscribing picks up right where you left off.",
       },
       {
-        q: "How do I upgrade to Premium?",
-        a: "Go to your Profile page and scroll to the AI Model section. Click 'Upgrade to Premium' and you'll be taken to a secure Stripe checkout page. After payment, your account is upgraded instantly.",
+        q: "How do I subscribe?",
+        a: "Go to your Profile page — the Plan card at the top shows monthly and yearly options. Checkout is handled securely by Stripe, and your account is activated the moment payment completes.",
       },
       {
-        q: "How do I cancel my Premium subscription?",
-        a: "Go to your Profile page, scroll to the billing section, and click 'Manage Billing'. This opens the Stripe billing portal where you can cancel, pause, or update your subscription. Your access continues until the end of the current billing period.",
+        q: "Which AI models are included?",
+        a: "All of them. Your subscription covers every model we offer; you can pick a default under Settings, and we fall back to the next one automatically if it's busy.",
       },
       {
-        q: "Will I be charged automatically each month?",
-        a: "Yes, Premium subscriptions renew automatically each month. You'll receive an email receipt from Stripe before each charge. Cancel anytime to stop future renewals.",
+        q: "How do I cancel?",
+        a: "Go to your Profile page and click 'Manage billing' on the Plan card. This opens the Stripe billing portal where you can cancel, switch between monthly and yearly, or update your card. Your access continues until the end of the current billing period.",
+      },
+      {
+        q: "Will I be charged automatically?",
+        a: "Yes, subscriptions renew automatically each month or year depending on your plan. Stripe emails a receipt for each charge. Cancel anytime to stop future renewals.",
       },
     ],
   },

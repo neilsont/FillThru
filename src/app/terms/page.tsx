@@ -45,7 +45,7 @@ export default function TermsOfServicePage() {
               <li>AI-powered resume parsing and cover letter generation</li>
               <li>A browser extension for auto-filling job applications</li>
               <li>Supplemental profile storage for common application questions</li>
-              <li>Premium AI model access via subscription</li>
+              <li>Full access to all features via subscription (after a free trial)</li>
             </ul>
           </section>
 
@@ -82,13 +82,13 @@ export default function TermsOfServicePage() {
 
           <section>
             <h2 className="text-xl font-bold text-primary mb-3">6. Subscriptions and Payments</h2>
-            <h3 className="font-semibold text-foreground mb-2">Free Tier</h3>
+            <h3 className="font-semibold text-foreground mb-2">Free Trial</h3>
             <p>
-              CareerLaunch offers a free tier with access to basic features and free AI models (Llama 3.3 70B via Groq, Qwen via OpenRouter).
+              Every new account receives a 7-day free trial with full access to the Service, including the browser extension. No payment method is required to start the trial. When the trial ends, access to AI features and the extension requires an active subscription.
             </p>
-            <h3 className="font-semibold text-foreground mt-4 mb-2">Premium Subscription</h3>
+            <h3 className="font-semibold text-foreground mt-4 mb-2">Subscription</h3>
             <p>
-              The Premium plan provides access to advanced AI models (GPT-4o Mini, Gemini 2.0 Flash, Claude Haiku) for $9.99/month. Subscriptions automatically renew each billing period unless cancelled.
+              Subscriptions are offered on a monthly or yearly basis at the prices shown at checkout. A subscription includes all features and all included AI models. Subscriptions automatically renew at the end of each billing period unless cancelled.
             </p>
             <h3 className="font-semibold text-foreground mt-4 mb-2">Cancellations and Refunds</h3>
             <ul className="list-disc list-inside space-y-1 ml-2">

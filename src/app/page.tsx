@@ -85,7 +85,7 @@ export default async function HomePage() {
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 stagger-2">
               <Button size="lg" className="rounded-full px-8 h-12 text-base font-semibold shadow-xl shadow-primary/20 transition-all hover:scale-105" asChild>
                 <Link href={user ? "/dashboard" : "/signup"}>
-                  {user ? "Go to Dashboard" : "Start Applying Free"}
+                  {user ? "Go to Dashboard" : "Start your free 7-day trial"}
                   <ArrowRight className="h-5 w-5 ml-2" />
                 </Link>
               </Button>
@@ -274,7 +274,7 @@ export default async function HomePage() {
             <h2 className="text-4xl md:text-5xl font-bold text-white mb-8 relative z-10">Ready to launch your career?</h2>
             <p className="text-primary-foreground/70 text-lg mb-10 max-w-xl mx-auto relative z-10">
               Join thousands of job seekers who are getting more interviews with less 
-              manual work. Start today, for free.
+              manual work. Try everything free for 7 days — no card required.
             </p>
             
             <div className="relative z-10 flex flex-col sm:flex-row gap-4 justify-center">
