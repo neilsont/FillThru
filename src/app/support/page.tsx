@@ -7,7 +7,7 @@ export const metadata = {
 };
 
 // Keep in sync with the address on the Privacy and Terms pages.
-const SUPPORT_EMAIL = "cosmispenguin2@gmail.com";
+const SUPPORT_EMAIL = "support@fillthru.com";
 
 const topics: { icon: typeof Rocket; title: string; body: string[] }[] = [
   {

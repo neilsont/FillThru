@@ -106,7 +106,7 @@ export default function PrivacyPolicyPage() {
             <h2 className="text-xl font-bold text-primary mb-3">5. Data Retention</h2>
             <p>
               We retain your personal data for as long as your account is active or as needed to provide the Service. You may request deletion of your account and associated data at any time by contacting us at{" "}
-              <a href="mailto:cosmispenguin2@gmail.com" className="text-primary underline">cosmispenguin2@gmail.com</a>.
+              <a href="mailto:support@fillthru.com" className="text-primary underline">support@fillthru.com</a>.
               Upon deletion, we will remove your data within 30 days, except where retention is required by law.
             </p>
           </section>
@@ -131,7 +131,7 @@ export default function PrivacyPolicyPage() {
             </ul>
             <p className="mt-3">
               To exercise these rights, contact us at{" "}
-              <a href="mailto:cosmispenguin2@gmail.com" className="text-primary underline">cosmispenguin2@gmail.com</a>.
+              <a href="mailto:support@fillthru.com" className="text-primary underline">support@fillthru.com</a>.
             </p>
           </section>
 
@@ -164,7 +164,7 @@ export default function PrivacyPolicyPage() {
             <div className="mt-3 p-4 bg-white rounded-xl border border-border/50">
               <p className="font-semibold text-foreground">Jicsaw LLC</p>
               <p>Fillthru Support</p>
-              <a href="mailto:cosmispenguin2@gmail.com" className="text-primary underline">cosmispenguin2@gmail.com</a>
+              <a href="mailto:support@fillthru.com" className="text-primary underline">support@fillthru.com</a>
             </div>
           </section>
         </div>

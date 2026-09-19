@@ -300,7 +300,7 @@ export default async function HomePage() {
               <Link href="/terms" className="hover:text-primary transition-colors">Terms of Service</Link>
               <Link href="/faq" className="hover:text-primary transition-colors">FAQ</Link>
               <Link href="/support" className="hover:text-primary transition-colors">Support</Link>
-              <a href="mailto:cosmispenguin2@gmail.com" className="hover:text-primary transition-colors">Contact Support</a>
+              <a href="mailto:support@fillthru.com" className="hover:text-primary transition-colors">Contact Support</a>
             </nav>
 
             <p className="text-muted-foreground/40 text-xs font-medium">

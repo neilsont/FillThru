@@ -61,7 +61,7 @@ export default function TermsOfServicePage() {
             <ul className="list-disc list-inside space-y-1 ml-2">
               <li>You are responsible for maintaining the confidentiality of your account credentials.</li>
               <li>You are responsible for all activity that occurs under your account.</li>
-              <li>You must notify us immediately of any unauthorized use of your account at <a href="mailto:cosmispenguin2@gmail.com" className="text-primary underline">cosmispenguin2@gmail.com</a>.</li>
+              <li>You must notify us immediately of any unauthorized use of your account at <a href="mailto:support@fillthru.com" className="text-primary underline">support@fillthru.com</a>.</li>
               <li>We reserve the right to suspend or terminate accounts that violate these Terms.</li>
             </ul>
           </section>
@@ -94,7 +94,7 @@ export default function TermsOfServicePage() {
             <ul className="list-disc list-inside space-y-1 ml-2">
               <li>You may cancel your subscription at any time through the billing portal in your profile.</li>
               <li>Cancellation takes effect at the end of the current billing period. No partial refunds are issued for unused time.</li>
-              <li>Refund requests for exceptional circumstances should be directed to <a href="mailto:cosmispenguin2@gmail.com" className="text-primary underline">cosmispenguin2@gmail.com</a>.</li>
+              <li>Refund requests for exceptional circumstances should be directed to <a href="mailto:support@fillthru.com" className="text-primary underline">support@fillthru.com</a>.</li>
             </ul>
             <p className="mt-3">
               All payments are processed securely by Stripe. Jicsaw LLC does not store your payment card information.
@@ -158,7 +158,7 @@ export default function TermsOfServicePage() {
             <div className="mt-3 p-4 bg-white rounded-xl border border-border/50">
               <p className="font-semibold text-foreground">Jicsaw LLC</p>
               <p>Fillthru Support</p>
-              <a href="mailto:cosmispenguin2@gmail.com" className="text-primary underline">cosmispenguin2@gmail.com</a>
+              <a href="mailto:support@fillthru.com" className="text-primary underline">support@fillthru.com</a>
             </div>
           </section>
 

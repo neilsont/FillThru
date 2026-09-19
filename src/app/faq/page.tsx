@@ -32,15 +32,15 @@ const faqs: { category: string; items: { q: string; a: string }[] }[] = [
     items: [
       {
         q: "I can't log in — what should I do?",
-        a: "First, make sure you're using the correct email and password. If you signed up with Google, use the 'Continue with Google' button instead of email/password. If you've forgotten your password, contact support at cosmispenguin2@gmail.com and we'll help you reset it.",
+        a: "First, make sure you're using the correct email and password. If you signed up with Google, use the 'Continue with Google' button instead of email/password. If you've forgotten your password, contact support at support@fillthru.com and we'll help you reset it.",
       },
       {
         q: "How do I change my email or password?",
-        a: "Email and password changes are currently managed through Supabase auth. Please contact support at cosmispenguin2@gmail.com with your request and we'll assist you.",
+        a: "Email and password changes are currently managed through Supabase auth. Please contact support at support@fillthru.com with your request and we'll assist you.",
       },
       {
         q: "How do I delete my account?",
-        a: "To delete your account and all associated data, email cosmispenguin2@gmail.com with the subject 'Account Deletion Request'. We will process your request within 30 days.",
+        a: "To delete your account and all associated data, email support@fillthru.com with the subject 'Account Deletion Request'. We will process your request within 30 days.",
       },
       {
         q: "Can I use the same account on multiple devices?",
@@ -150,7 +150,7 @@ export default function FAQPage() {
             <span className="font-bold text-primary">Fillthru</span>
           </Link>
           <a
-            href="mailto:cosmispenguin2@gmail.com"
+            href="mailto:support@fillthru.com"
             className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors"
           >
             Contact Support
@@ -163,7 +163,7 @@ export default function FAQPage() {
           <h1 className="text-4xl font-extrabold text-primary mb-3">Frequently Asked Questions</h1>
           <p className="text-muted-foreground text-lg max-w-xl mx-auto">
             Everything you need to know about Fillthru. Can&apos;t find your answer?{" "}
-            <a href="mailto:cosmispenguin2@gmail.com" className="text-primary hover:underline">
+            <a href="mailto:support@fillthru.com" className="text-primary hover:underline">
               Contact our support team.
             </a>
           </p>
@@ -201,10 +201,10 @@ export default function FAQPage() {
             Our support team is here to help. Send us an email and we&apos;ll get back to you as soon as possible.
           </p>
           <a
-            href="mailto:cosmispenguin2@gmail.com"
+            href="mailto:support@fillthru.com"
             className="inline-flex items-center justify-center rounded-full bg-white text-primary font-semibold px-8 py-3 hover:bg-white/90 transition-colors"
           >
-            cosmispenguin2@gmail.com
+            support@fillthru.com
           </a>
         </div>
       </main>
