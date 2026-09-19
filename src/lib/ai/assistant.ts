@@ -120,13 +120,17 @@ export function buildAssistantPrompt(args: {
   messages: ChatMessage[];
   context: PageContext;
   resume: ParsedResume | null;
+  resumeText?: string | null;
   facts: Record<string, string>;
 }): string {
-  const { intent, messages, context, resume, facts } = args;
+  const { intent, messages, context, resume, resumeText, facts } = args;
   const known = {
     resume: resume ?? "(no résumé uploaded)",
     saved_facts: Object.keys(facts).length ? facts : "(nothing saved yet)",
   };
+  const resumeExcerpt = resumeText?.trim()
+    ? `\nRÉSUMÉ TEXT (verbatim, for details the summary above may miss):\n"""${resumeText.trim().slice(0, 7000)}"""`
+    : "";
   const transcript = messages
     .slice(-14)
     .map((m) => `${m.role === "user" ? "USER" : "ASSISTANT"}: ${m.content}`)
@@ -136,7 +140,7 @@ export function buildAssistantPrompt(args: {
     intentInstruction(intent),
     "",
     "WHAT YOU KNOW ABOUT THE USER:",
-    JSON.stringify(known, null, 1).slice(0, 12000),
+    JSON.stringify(known, null, 1).slice(0, 12000) + resumeExcerpt,
     "",
     "PAGE:",
     `url: ${context.url ?? ""}`,

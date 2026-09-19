@@ -40,6 +40,7 @@ const askInput = $("ask-input");
 const askSend = $("ask-send");
 const askAttach = $("ask-attach");
 const resumeFile = $("resume-file");
+const composerFiles = $("composer-files");
 const scrollArea = $("scroll");
 
 // ── Networking ──────────────────────────────────────────────────────────────
@@ -355,18 +356,42 @@ function resolveMessage(pending, text, { error = false } = {}) {
   scrollToBottom();
 }
 
-function appendAttachment(file) {
+function fileKind(file) {
+  return /\.docx?$/i.test(file.name) || /wordprocessingml|msword/.test(file.type) ? "DOCX" : "PDF";
+}
+
+function buildFileChip(file, { removable = false, onRemove = null } = {}) {
+  const chip = document.createElement("div");
+  chip.className = "file-chip";
+  const kind = fileKind(file);
+  const kb = Math.max(1, Math.round(file.size / 1024));
+  chip.innerHTML = `<span class="file-icon ${kind.toLowerCase()}">${kind}</span><span class="file-meta"><span class="file-name"></span><span class="file-sub">Résumé · ${kb} KB</span></span>`;
+  chip.querySelector(".file-name").textContent = file.name;
+  if (removable) {
+    const x = document.createElement("button");
+    x.type = "button";
+    x.className = "file-remove";
+    x.title = "Remove";
+    x.textContent = "×";
+    x.addEventListener("click", onRemove);
+    chip.appendChild(x);
+  }
+  return chip;
+}
+
+function appendUserMessage({ text = "", file = null } = {}) {
   const wrap = document.createElement("div");
   wrap.className = "msg msg-user";
-  const chip = document.createElement("div");
-  chip.className = "attachment";
-  const kb = Math.max(1, Math.round(file.size / 1024));
-  chip.innerHTML = `<span class="attachment-icon">📄</span><span class="attachment-meta"><span class="attachment-name"></span><span class="attachment-sub">Résumé · ${kb} KB</span></span>`;
-  chip.querySelector(".attachment-name").textContent = file.name;
-  wrap.appendChild(chip);
+  if (file) wrap.appendChild(buildFileChip(file));
+  if (text) {
+    const bubble = document.createElement("div");
+    bubble.className = "bubble";
+    bubble.textContent = text;
+    wrap.appendChild(bubble);
+  }
   askThread.appendChild(wrap);
   scrollToBottom();
-  return chip;
+  return wrap;
 }
 
 function makeButton(className, label, onClick) {
@@ -462,7 +487,7 @@ const chatHistory = [];       // [{ role, content }] shown in the thread this se
 let pendingQuestions = [];    // [{ id, question }] the assistant asked last turn
 let turnInFlight = false;
 
-async function runTurn({ intent = "chat", userMessage = null, includeFields = true } = {}) {
+async function runTurn({ intent = "chat", userMessage = null, includeFields = true, alreadyRendered = false } = {}) {
   if (turnInFlight) return null;
   const token = await getValidToken();
   if (!token) return null;
@@ -471,7 +496,7 @@ async function runTurn({ intent = "chat", userMessage = null, includeFields = tr
   askSend.disabled = true;
   if (userMessage) {
     chatHistory.push({ role: "user", content: userMessage });
-    appendMessage("user", userMessage);
+    if (!alreadyRendered) appendUserMessage({ text: userMessage });
   }
   const pending = appendMessage("assistant", "Thinking…", { thinking: true });
 
@@ -822,15 +847,32 @@ btnTranslate.addEventListener("click", async () => {
 function autosizeAsk() {
   askInput.style.height = "auto";
   askInput.style.height = `${Math.min(askInput.scrollHeight, 120)}px`;
-  askSend.disabled = turnInFlight || !askInput.value.trim();
+  askSend.disabled = turnInFlight || (!askInput.value.trim() && !pendingFile);
 }
 
 async function submitAsk() {
   const question = askInput.value.trim();
-  if (!question || turnInFlight) return;
+  const file = pendingFile;
+  if ((!question && !file) || turnInFlight) return;
   askInput.value = "";
+  clearPendingFile();
   autosizeAsk();
-  await runTurn({ intent: "chat", userMessage: question });
+
+  if (!file) {
+    await runTurn({ intent: "chat", userMessage: question });
+    return;
+  }
+
+  // The file goes with the message, ChatGPT-style: chip + text in one user turn.
+  appendUserMessage({ text: question, file });
+  const summary = await uploadResume(file);
+  if (!summary) return; // upload error already shown
+  if (question) {
+    await runTurn({ intent: "chat", userMessage: `${question}\n(attached résumé: ${file.name} — now on file)`, alreadyRendered: true });
+  } else {
+    appendMessage("assistant", summary);
+    chatHistory.push({ role: "user", content: `(attached résumé: ${file.name})` }, { role: "assistant", content: summary });
+  }
 }
 
 askInput.addEventListener("input", autosizeAsk);
@@ -842,7 +884,24 @@ askInput.addEventListener("keydown", (event) => {
 });
 askSend.addEventListener("click", submitAsk);
 
-// ── Résumé upload (the + button) ────────────────────────────────────────────
+// ── Attachments (the + button) ──────────────────────────────────────────────
+// Picking a file parks it in the composer as a chip; it's uploaded when the
+// message is sent, and from then on it's context for every turn.
+
+let pendingFile = null;
+
+function renderPendingFile() {
+  composerFiles.replaceChildren();
+  if (!pendingFile) { composerFiles.hidden = true; return; }
+  composerFiles.appendChild(buildFileChip(pendingFile, { removable: true, onRemove: () => { clearPendingFile(); autosizeAsk(); } }));
+  composerFiles.hidden = false;
+}
+
+function clearPendingFile() {
+  pendingFile = null;
+  resumeFile.value = "";
+  renderPendingFile();
+}
 
 function openResumePicker() {
   closeMenu();
@@ -852,16 +911,21 @@ function openResumePicker() {
 askAttach.addEventListener("click", openResumePicker);
 menuUpload.addEventListener("click", openResumePicker);
 
-resumeFile.addEventListener("change", async () => {
+resumeFile.addEventListener("change", () => {
   const file = resumeFile.files?.[0];
   if (!file) return;
-  const token = await getValidToken();
-  if (!token) return;
+  pendingFile = file;
+  renderPendingFile();
+  autosizeAsk();
+  askInput.focus();
+});
 
-  appendAttachment(file);
+// Uploads + parses the résumé; returns a one-line summary or null on failure.
+async function uploadResume(file) {
+  const token = await getValidToken();
+  if (!token) return null;
   const pending = appendMessage("assistant", `Reading ${file.name}…`, { thinking: true });
   askAttach.disabled = true;
-
   try {
     const form = new FormData();
     form.append("file", file);
@@ -876,14 +940,16 @@ resumeFile.addEventListener("change", async () => {
     const roles = parsed.experience?.length || 0;
     const skills = parsed.skills?.length || 0;
     cachedProfile = null; // refetch on next fill so the new résumé is used
-    resolveMessage(pending, `Got it — ${name}, ${roles} role${roles === 1 ? "" : "s"}, ${skills} skill${skills === 1 ? "" : "s"}. I'll use this for forms, answers, and cover letters from now on.`);
-    chatHistory.push({ role: "user", content: `(uploaded résumé: ${file.name})` });
+    pending.wrap.remove();
+    return `Got it — ${name}, ${roles} role${roles === 1 ? "" : "s"}, ${skills} skill${skills === 1 ? "" : "s"}. I'll use this for forms, answers, and cover letters from now on.`;
   } catch (err) {
     if (err?.status !== 402) resolveMessage(pending, err.message || "Couldn't read that file.", { error: true });
+    else pending.wrap.remove();
+    return null;
   } finally {
     askAttach.disabled = false;
   }
-});
+}
 
 // ── Menu / misc ─────────────────────────────────────────────────────────────
 
@@ -908,6 +974,7 @@ menuClear.addEventListener("click", () => {
   askThread.replaceChildren();
   chatHistory.length = 0;
   pendingQuestions = [];
+  clearPendingFile();
 });
 
 btnHide.addEventListener("click", async () => {

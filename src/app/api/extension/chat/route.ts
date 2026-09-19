@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
     }
 
     const [{ data: resumeRow }, { data: supplementalRows }] = await Promise.all([
-      supabase.from("resume_data").select("parsed_json").eq("user_id", user.id).maybeSingle(),
+      supabase.from("resume_data").select("parsed_json, raw_text").eq("user_id", user.id).maybeSingle(),
       supabase.from("supplemental_answers").select("question_key, answer").eq("user_id", user.id),
     ]);
     const facts: Record<string, string> = {};
@@ -65,6 +65,7 @@ export async function POST(request: NextRequest) {
       messages,
       context,
       resume: (resumeRow?.parsed_json as ParsedResume | null) ?? null,
+      resumeText: (resumeRow?.raw_text as string | null) ?? null,
       facts,
       model,
       fallbackModels: getModelFallbackChain(model, true),

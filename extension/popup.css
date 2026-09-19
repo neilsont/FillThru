@@ -286,21 +286,6 @@ body {
 .answer-actions .btn { flex: 1; padding: 6px 8px; font-size: 12px; }
 .msg-assistant .answer-actions { margin-top: 2px; }
 
-/* Résumé attachment chip (shown when a file is added to the chat) */
-.attachment {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  max-width: 88%;
-  padding: 8px 12px 8px 10px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: #f6f7f9;
-}
-.attachment-icon { font-size: 20px; line-height: 1; }
-.attachment-meta { display: flex; flex-direction: column; min-width: 0; }
-.attachment-name { font-size: 13px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.attachment-sub { font-size: 11px; color: var(--slate); }
 
 /* ── Ask box (pinned) ───────────────────────────────────────────────── */
 .ask-box {
@@ -315,6 +300,54 @@ body {
   border-color: var(--navy-mid);
   box-shadow: 0 0 0 3px rgba(26,58,92,0.10);
 }
+.composer-files { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px 10px 0; }
+.composer-files[hidden] { display: none; }
+.file-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #f6f7f9;
+}
+.file-chip .file-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: #e8332b;
+  color: #fff;
+  font: 700 9px/1 var(--font);
+  letter-spacing: 0.04em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.file-chip .file-icon.docx { background: #2b579a; }
+.file-chip .file-meta { display: flex; flex-direction: column; min-width: 0; }
+.file-chip .file-name { font-size: 13px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px; }
+.file-chip .file-sub { font-size: 11px; color: var(--slate); }
+.file-chip .file-remove {
+  margin-left: 2px;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  line-height: 1;
+}
+.file-chip .file-remove:hover { background: var(--hover); color: var(--text); }
+.msg-user .file-chip { background: #eef2f7; }
+.msg-user .file-chip + .bubble { margin-top: 6px; }
+
 .ask-box textarea {
   display: block;
   width: 100%;
