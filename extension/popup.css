@@ -168,6 +168,33 @@ body {
   margin-bottom: 12px;
 }
 
+.link-btn {
+  display: block;
+  margin: 14px auto 0;
+  border: none;
+  background: none;
+  color: var(--slate);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.link-btn:hover { color: var(--text); }
+.email-form { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.text-input {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font: inherit;
+  font-size: 14px;
+  color: var(--text);
+  background: var(--white);
+  outline: none;
+}
+.text-input:focus { border-color: var(--navy-mid); box-shadow: 0 0 0 3px rgba(26,58,92,0.10); }
+
 /* ── Home ───────────────────────────────────────────────────────────── */
 .home-head { padding: 12px 0 8px; }
 

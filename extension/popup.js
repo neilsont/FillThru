@@ -20,6 +20,8 @@ const viewMain = $("view-main");
 const viewPaywall = $("view-paywall");
 const loginError = $("login-error");
 const btnLogin = $("btn-login");
+const btnEmailToggle = $("btn-email-toggle");
+const emailForm = $("email-form");
 const btnLogout = $("btn-logout");
 const btnClose = $("btn-close");
 const btnHide = $("btn-hide");
@@ -192,6 +194,21 @@ async function signInWithGoogle() {
     throw new Error(err.error_description || err.msg || "Sign in failed");
   }
   return res.json(); // { access_token, refresh_token, expires_in, user }
+}
+
+// Email + password (Supabase password grant). Google is the primary path; this
+// exists for accounts without Google and for Chrome Web Store reviewers.
+async function signInWithEmail(email, password) {
+  const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "apikey": SUPABASE_ANON_KEY },
+    body: JSON.stringify({ email, password }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error_description || err.msg || err.message || "Wrong email or password");
+  }
+  return res.json();
 }
 
 const AUTH_KEYS = ["access_token", "refresh_token", "expires_at", "user_email", "user_id"];
@@ -1560,6 +1577,33 @@ btnLogin.addEventListener("click", async () => {
   } finally {
     btnLogin.disabled = false;
     btnLogin.innerHTML = original;
+  }
+});
+
+btnEmailToggle.addEventListener("click", () => {
+  emailForm.hidden = !emailForm.hidden;
+  btnEmailToggle.textContent = emailForm.hidden ? "Sign in with email instead" : "Use Google instead";
+  if (!emailForm.hidden) $("email-input").focus();
+});
+
+emailForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  loginError.style.display = "none";
+  const btn = $("btn-email-login");
+  btn.disabled = true;
+  btn.textContent = "Signing in…";
+  try {
+    const auth = await signInWithEmail($("email-input").value.trim(), $("password-input").value);
+    await storeSession(auth, auth.user?.email ?? "");
+    showMainView(await fetchProfile(auth.access_token));
+  } catch (err) {
+    if (err?.status !== 402) {
+      loginError.textContent = err.message ?? "Sign in failed";
+      loginError.style.display = "block";
+    }
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Sign in";
   }
 });
 
