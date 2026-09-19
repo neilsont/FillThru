@@ -299,6 +299,7 @@ export default async function HomePage() {
               <Link href="/privacy" className="hover:text-primary transition-colors">Privacy Policy</Link>
               <Link href="/terms" className="hover:text-primary transition-colors">Terms of Service</Link>
               <Link href="/faq" className="hover:text-primary transition-colors">FAQ</Link>
+              <Link href="/support" className="hover:text-primary transition-colors">Support</Link>
               <a href="mailto:cosmispenguin2@gmail.com" className="hover:text-primary transition-colors">Contact Support</a>
             </nav>
 
