@@ -9,7 +9,7 @@
     "lint": "eslint",
     "seed": "tsx scripts/seed.ts",
     "mongo:indexes": "tsx --env-file=.env.local scripts/mongo-indexes.ts",
-    "extension:package": "mkdir -p build && rm -f build/careerlaunch-extension-*.zip && cd extension && zip -r -X ../build/careerlaunch-extension-v$(node -p \"require(\\\"./manifest.json\\\").version\").zip . -x \"*.DS_Store\" -x \"STORE_LISTING.md\""
+    "extension:package": "mkdir -p build && rm -f build/fillthru-extension-*.zip && cd extension && zip -r -X ../build/fillthru-extension-v$(node -p \"require(\\\"./manifest.json\\\").version\").zip . -x \"*.DS_Store\" -x \"STORE_LISTING.md\""
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.82.0",
