@@ -56,7 +56,18 @@ export default function PrivacyPolicyPage() {
 
             <h3 className="font-semibold text-foreground mt-5 mb-2">Information from the Browser Extension</h3>
             <p>
-              The Fillthru browser extension reads job posting content from pages you visit solely to assist with auto-filling applications. This data is processed in real time and is not stored on our servers unless you explicitly save a job to your dashboard.
+              The Fillthru browser extension only acts when you use it — clicking one of its actions, sending a message in its chat, or running Autopilot. It does not read pages in the background. When you use it, it may read and send to our servers:
+            </p>
+            <ul className="list-disc list-inside space-y-1 ml-2 mt-2">
+              <li>The address, title, form fields, and detected job posting of the page you are on, so the assistant can fill fields and answer questions about it</li>
+              <li>Text you have selected on the page, when you ask about it</li>
+              <li>The addresses and titles of your other open tabs, and any job posting detected on them, so a posting in one tab can be used on another — the full text of another tab is read only when the assistant needs it for your request</li>
+              <li>Files you attach in the chat (read once to extract their text; the text is kept for that conversation only and not stored on our servers) and resumes you upload (stored in your account)</li>
+              <li>Your conversations with the assistant, which are stored in your account so you can review, reopen, or delete them from the extension or the Chat history page</li>
+              <li>Applications listed on a careers site&rsquo;s &ldquo;My Applications&rdquo; page, when you choose to import them</li>
+            </ul>
+            <p className="mt-3">
+              Page translation runs on your device using Chrome&rsquo;s built-in translator when available; the page text is not sent to us for that feature.
             </p>
           </section>
 
@@ -84,7 +95,8 @@ export default function PrivacyPolicyPage() {
             <ul className="list-disc list-inside space-y-1 ml-2 mt-2">
               <li><strong>Supabase</strong> — database and authentication infrastructure</li>
               <li><strong>Stripe</strong> — payment processing</li>
-              <li><strong>AI providers</strong> (Anthropic, OpenAI, Google, Groq, OpenRouter) — only the data necessary to generate AI responses; governed by their respective data processing terms</li>
+              <li><strong>AI providers</strong> — Google (Gemini) and OpenRouter (which routes to model providers such as DeepSeek and NVIDIA), and, where enabled, OpenAI and Anthropic — receive only the data necessary to generate a response (relevant parts of your resume, saved answers, the page you are working on, and your message); governed by their respective data processing terms</li>
+              <li><strong>MongoDB Atlas</strong> — storage for your assistant conversations and a record of AI generations</li>
               <li><strong>Vercel</strong> — hosting and deployment infrastructure</li>
               <li><strong>Law enforcement</strong> — if required by applicable law or valid legal process</li>
             </ul>

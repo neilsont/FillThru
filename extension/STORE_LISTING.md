@@ -84,7 +84,7 @@ Used for Google sign-in via `chrome.identity.launchWebAuthFlow`, so the user can
 Lets the user copy an AI-generated answer to a screening question from the popup and paste it into a field the auto-fill couldn't reach.
 
 **Host permission `<all_urls>`**
-Job applications live on thousands of different domains — every company's own careers site plus ATS providers like Greenhouse, Lever, Workday, Ashby, iCIMS, SmartRecruiters, and Indeed. A fixed domain list is not feasible. The content script is passive: it registers a message listener and does nothing until the user clicks Auto-fill in the popup or starts an Autopilot run from their dashboard. It does not read, collect, or transmit page content on its own.
+Job applications live on thousands of different domains — every company's own careers site plus ATS providers like Greenhouse, Lever, Workday, Ashby, iCIMS, SmartRecruiters, and Indeed. A fixed domain list is not feasible. The content script is passive: it registers a message listener and does nothing until the user opens the assistant (toolbar icon or ⌥F) and uses one of its actions or the chat. Page content (form fields, the job posting, selected text) is read only at that moment. To let a job description open in one tab be used on an application in another, the assistant is also given the titles and URLs of the user's other open tabs and any job posting detected on them when the user sends a request; the full text of another tab is read only when the assistant needs it for that request. Nothing is read in the background.
 
 **Remote code:** No, I am not using remote code. All JavaScript is bundled in the package.
 
@@ -93,11 +93,13 @@ Job applications live on thousands of different domains — every company's own 
 Check these under "What user data do you plan to collect?":
 - ☑ Personally identifiable information (name, email, phone, address — the user's own profile, used to fill forms)
 - ☑ Authentication information (session token for the Fillthru account)
-- ☐ Personal communications — **leave unchecked**
+- ☑ Personal communications — the user's chat messages with the assistant are stored in their account (Chat history)
+- ☑ Web history — the titles and URLs of the user's open tabs are sent with assistant requests so a posting in one tab can be used on another
+- ☑ Website content — form fields, job postings, selected text, and (on request) page text are sent to Fillthru's servers to fill forms and answer questions
 - ☐ Location — **leave unchecked** (address is PII, not geolocation)
-- ☐ Web history — **leave unchecked**
-- ☐ User activity — **leave unchecked**
-- ☐ Website content — check **only if** job-posting extraction is considered "collection" (it sends job title/company/description to Fillthru when the user saves a job). Safer to check it and explain.
+- ☐ User activity — **leave unchecked** (no clicks/keystrokes/browsing tracking)
+
+All of it is used only for the extension's single purpose, is never sold, and the policy at https://fillthru.com/privacy describes each item.
 
 Certify all three:
 - ☑ I do not sell or transfer user data to third parties, outside of the approved use cases
