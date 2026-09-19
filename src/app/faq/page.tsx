@@ -99,7 +99,7 @@ const faqs: { category: string; items: { q: string; a: string }[] }[] = [
     items: [
       {
         q: "What happens when my free trial ends?",
-        a: "The extension and AI features pause until you subscribe. Your résumé, saved jobs, and answers stay in your account, so subscribing picks up right where you left off.",
+        a: "The extension and AI features pause until you subscribe. Your resume, saved jobs, and answers stay in your account, so subscribing picks up right where you left off.",
       },
       {
         q: "How do I subscribe?",

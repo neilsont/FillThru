@@ -43,6 +43,11 @@ const resumeFile = $("resume-file");
 const composerFiles = $("composer-files");
 const moveHere = $("move-here");
 const menuMove = $("menu-move");
+const menuHistory = $("menu-history");
+const historyView = $("history-view");
+const historyList = $("history-list");
+const historyBack = $("history-back");
+const historyClear = $("history-clear");
 $("menu-version").textContent = `Fillthru v${chrome.runtime?.getManifest?.().version ?? "dev"}`;
 const btnMoveHere = $("btn-move-here");
 const btnMoveDismiss = $("btn-move-dismiss");
@@ -395,7 +400,7 @@ function buildFileChip(file, { removable = false, onRemove = null, role = "file"
   chip.className = "file-chip";
   const kind = fileKind(file);
   const kb = Math.max(1, Math.round(file.size / 1024));
-  chip.innerHTML = `<span class="file-icon ${kind.toLowerCase()}">${kind}</span><span class="file-meta"><span class="file-name"></span><span class="file-sub">${role === "resume" ? "Résumé" : "File"} · ${kb} KB</span></span>`;
+  chip.innerHTML = `<span class="file-icon ${kind.toLowerCase()}">${kind}</span><span class="file-meta"><span class="file-name"></span><span class="file-sub">${role === "resume" ? "Resume" : "File"} · ${kb} KB</span></span>`;
   chip.querySelector(".file-name").textContent = file.name;
   if (removable) {
     const x = document.createElement("button");
@@ -434,6 +439,13 @@ function appendUserMessage({ text = "", file = null, role = "file", record = tru
 
 let currentTabId = null;
 let persistTimer = null;
+let syncTimer = null;
+let chatId = null; // durable id for the conversation on screen (server + session copy)
+
+function newChatId() {
+  const bytes = crypto.getRandomValues(new Uint8Array(12));
+  return "c_" + Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+}
 
 async function getTabId() {
   if (currentTabId != null) return currentTabId;
@@ -444,6 +456,7 @@ async function getTabId() {
 
 function chatSnapshot() {
   return {
+    chatId,
     log: threadLog.slice(-80),
     history: chatHistory.slice(-30),
     attachments: chatAttachments.map((a) => ({ name: a.name, text: a.text })),
@@ -465,11 +478,37 @@ function persistChat() {
     let host = "";
     try { host = new URL(info?.url || "").hostname.replace(/^www\./, ""); } catch { host = ""; }
     const firstUser = threadLog.find((e) => e.kind === "user" && e.text)?.text || threadLog.find((e) => e.kind === "user" && e.file)?.file?.name || "Conversation";
+    if (!chatId) chatId = newChatId();
     chrome.storage.session.set({
       [`chat:${tabId}`]: chatSnapshot(),
       chat_recent: { tabId, host, preview: firstUser.slice(0, 80), count: threadLog.length, at: Date.now() },
     }).catch(() => {});
+    scheduleSync({ host, url: info?.url || "", title: firstUser.slice(0, 120) });
   }, 150);
+}
+
+// Durable copy on the server: browsable from any tab or the website's Chat history.
+function scheduleSync(meta) {
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(async () => {
+    if (!chatId || !threadLog.length) return;
+    const token = await getValidToken().catch(() => null);
+    if (!token) return;
+    fetchCareerLaunch("/api/chats", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+      body: JSON.stringify({
+        chatId,
+        host: meta.host,
+        url: meta.url,
+        title: meta.title,
+        messages: threadLog.slice(-200).map((e) => ({ kind: e.kind, text: e.text, error: e.error, textActions: e.textActions, file: e.file || null })),
+        history: chatHistory.slice(-40),
+        pendingQuestions,
+        attachmentNames: chatAttachments.map((a) => a.name),
+      }),
+    }, { fallbackMessage: "sync", timeoutMs: 8000 }).catch(() => { /* best effort */ });
+  }, 1500);
 }
 
 function replayChat(snapshot, { append = false } = {}) {
@@ -478,6 +517,7 @@ function replayChat(snapshot, { append = false } = {}) {
     threadLog.length = 0;
     chatHistory.length = 0;
     chatAttachments.length = 0;
+    chatId = snapshot.chatId || chatId || newChatId();
   } else if (threadLog.length) {
     const divider = document.createElement("div");
     divider.className = "thread-divider";
@@ -528,6 +568,7 @@ async function restoreChat() {
   if (tabId == null) return;
   const { [`chat:${tabId}`]: own } = await chrome.storage.session.get(`chat:${tabId}`);
   if (own?.log?.length) replayChat(own);
+  else if (!chatId) chatId = newChatId();
 
   // A recent chat on another tab: always reachable from ⋯, and offered as a
   // banner when this tab has nothing yet.
@@ -618,8 +659,26 @@ function setActionBusy(button, busy, busyText = "Working…") {
 
 // ── Page context for the assistant ──────────────────────────────────────────
 
+let lastPageKind = "unknown";
+
 async function getJobInfo() {
-  return (await relayToContent({ type: "CL_EXTRACT_JOB" })) || null;
+  const res = await relayToContent({ type: "CL_EXTRACT_JOB" });
+  if (res?.pageKind) { lastPageKind = res.pageKind; return null; }
+  lastPageKind = "unknown";
+  return res || null;
+}
+
+function noPostingMessage() {
+  switch (lastPageKind) {
+    case "workday_home":
+      return "This is Workday's candidate home — it lists your applications but isn't a job posting itself. Open the job under \"My Applications\" (or the posting), then save it. Or just tell me the title and company and I'll save it from here.";
+    case "workday_application":
+      return "This is an application step, not the posting. Tell me the job title and company and I'll save it — or open the posting page and try again.";
+    case "search_results":
+      return "This is a search results page. Open a specific job and I'll save that one.";
+    default:
+      return "I couldn't find a job posting on this page. Open the listing or the application page and try again — or tell me the title and company and I'll save it.";
+  }
 }
 
 async function getOtherTabs() {
@@ -773,7 +832,7 @@ async function applyTurn(turn, token) {
 
 async function runAction(action, token) {
   switch (action.type) {
-    case "save_job": return saveCurrentJob(token);
+    case "save_job": return saveCurrentJob(token, action);
     case "write_cover_letter": return writeCoverLetter(token, action.notes || "");
     case "translate_page": return translatePage(action.target);
     case "insert_text": {
@@ -790,7 +849,7 @@ async function runAction(action, token) {
     case "set_resume": {
       const name = action.name || [...attachedFiles.keys()].pop();
       const file = name && attachedFiles.get(name);
-      if (!file) return "I don't have that file any more — add it again with + and I'll set it as your résumé.";
+      if (!file) return "I don't have that file any more — add it again with + and I'll set it as your resume.";
       const summary = await uploadResume(file);
       return summary || "";
     }
@@ -816,9 +875,13 @@ async function saveJobToCareerLaunch(token, jobInfo, filledFields = null) {
 
 const STAGE_LABELS = { discovered: "Saved", in_progress: "In progress", applied: "Applied", interviewing: "Interviewing", rejected: "Rejected", offer: "Offer" };
 
-async function saveCurrentJob(token) {
-  const info = await getJobInfo();
-  if (!info?.title || !info?.url) return "I couldn't find a job posting on this page to save. Open the listing or the application page and try again.";
+async function saveCurrentJob(token, given = null) {
+  let info = await getJobInfo();
+  if ((!info?.title || !info?.url) && given?.title) {
+    const tab = await getTabInfo().catch(() => null);
+    info = { title: given.title, company: given.company || "", location: given.location || "", description: given.description || "", url: given.url || tab?.url || "" };
+  }
+  if (!info?.title || !info?.url) return noPostingMessage();
   const result = await saveJobToCareerLaunch(token, info);
   if (!result) return "Couldn't save this job right now — please try again in a moment.";
   const stage = STAGE_LABELS[result.job?.status] || "In progress";
@@ -1124,10 +1187,10 @@ async function submitAsk() {
     const summary = await uploadResume(file.file);
     if (!summary) return; // error already shown
     if (question) {
-      await runTurn({ intent: "chat", userMessage: `${question}\n(attached résumé: ${file.file.name} — now on file)`, alreadyRendered: true });
+      await runTurn({ intent: "chat", userMessage: `${question}\n(attached resume: ${file.file.name} — now on file)`, alreadyRendered: true });
     } else {
       appendMessage("assistant", summary);
-      chatHistory.push({ role: "user", content: `(attached résumé: ${file.file.name})` }, { role: "assistant", content: summary });
+      chatHistory.push({ role: "user", content: `(attached resume: ${file.file.name})` }, { role: "assistant", content: summary });
     }
     return;
   }
@@ -1135,15 +1198,15 @@ async function submitAsk() {
   const extracted = await extractAttachment(file.file);
   if (!extracted) return;
 
-  // Looks like a résumé and there's none on file → it becomes the résumé, no questions asked.
+  // Looks like a resume and there's none on file → it becomes the resume, no questions asked.
   if (extracted.looksLikeResume && !cachedProfile?.profile) {
     const summary = await uploadResume(file.file);
     if (!summary) return;
     if (question) {
-      await runTurn({ intent: "chat", userMessage: `${question}\n(attached résumé: ${file.file.name} — now on file)`, alreadyRendered: true });
+      await runTurn({ intent: "chat", userMessage: `${question}\n(attached resume: ${file.file.name} — now on file)`, alreadyRendered: true });
     } else {
       appendMessage("assistant", summary);
-      chatHistory.push({ role: "user", content: `(attached résumé: ${file.file.name})` }, { role: "assistant", content: summary });
+      chatHistory.push({ role: "user", content: `(attached resume: ${file.file.name})` }, { role: "assistant", content: summary });
     }
     return;
   }
@@ -1152,7 +1215,7 @@ async function submitAsk() {
   attachedFiles.set(extracted.name, file.file);
   let note = `(attached file: ${extracted.name}${extracted.truncated ? ", long — first part only" : ""})`;
   if (extracted.looksLikeResume) {
-    note += " This looks like a résumé and the user already has one on file — ask in one short sentence whether to replace it, unless the message already says.";
+    note += " This looks like a resume and the user already has one on file — ask in one short sentence whether to replace it, unless the message already says.";
   }
   if (question) {
     await runTurn({ intent: "chat", userMessage: `${question}\n${note}`, alreadyRendered: true });
@@ -1176,7 +1239,7 @@ askSend.addEventListener("click", submitAsk);
 
 let pendingFile = null; // { file, role: "file" | "resume" }
 let pickRole = "file";
-const attachedFiles = new Map(); // name → File, kept for a later "use this as my résumé"
+const attachedFiles = new Map(); // name → File, kept for a later "use this as my resume"
 
 const IMAGE_ACCEPT = ".png,.jpg,.jpeg,.webp,.heic,.heif,.gif,image/*";
 const ACCEPT = {
@@ -1240,7 +1303,7 @@ async function extractAttachment(file) {
   }
 }
 
-// Uploads + parses the résumé; returns a one-line summary or null on failure.
+// Uploads + parses the resume; returns a one-line summary or null on failure.
 async function uploadResume(file) {
   const token = await getValidToken();
   if (!token) return null;
@@ -1256,10 +1319,10 @@ async function uploadResume(file) {
     }, { fallbackMessage: "Upload failed", timeoutMs: 90000, timeoutMessage: "The upload took too long. Please try again." });
 
     const parsed = payload.data || {};
-    const name = parsed.personal?.name || "your résumé";
+    const name = parsed.personal?.name || "your resume";
     const roles = parsed.experience?.length || 0;
     const skills = parsed.skills?.length || 0;
-    cachedProfile = null; // refetch on next fill so the new résumé is used
+    cachedProfile = null; // refetch on next fill so the new resume is used
     pending.wrap.remove();
     return `Got it — ${name}, ${roles} role${roles === 1 ? "" : "s"}, ${skills} skill${skills === 1 ? "" : "s"}. I'll use this for forms, answers, and cover letters from now on.`;
   } catch (err) {
@@ -1289,8 +1352,7 @@ document.addEventListener("click", (event) => {
 });
 openDashboard.addEventListener("click", closeMenu);
 
-menuClear.addEventListener("click", () => {
-  closeMenu();
+function startNewConversation() {
   askThread.replaceChildren();
   chatHistory.length = 0;
   chatAttachments.length = 0;
@@ -1298,7 +1360,129 @@ menuClear.addEventListener("click", () => {
   threadLog.length = 0;
   pendingQuestions = [];
   clearPendingFile();
-  persistChat();
+  chatId = newChatId();
+  clearTimeout(syncTimer);
+  persistChat(); // empty log → removes this tab's session copy; the old chat stays in history
+}
+
+menuClear.addEventListener("click", () => {
+  closeMenu();
+  startNewConversation();
+  askInput.focus();
+});
+
+// ── Chat history (server-backed; every tab and device) ──────────────────────
+
+function timeAgo(value) {
+  const diff = Date.now() - new Date(value).getTime();
+  const m = Math.round(diff / 60_000);
+  if (m < 1) return "just now";
+  if (m < 60) return `${m}m ago`;
+  const h = Math.round(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.round(h / 24);
+  if (d < 7) return `${d}d ago`;
+  return new Date(value).toLocaleDateString();
+}
+
+function showHistoryView(show) {
+  historyView.hidden = !show;
+  askThread.hidden = show;
+  document.querySelector(".actions").hidden = show;
+  document.querySelector(".home-head").hidden = show;
+  moveHere.hidden = show || moveHere.hidden;
+}
+
+async function loadHistory() {
+  historyList.replaceChildren();
+  const loading = document.createElement("div");
+  loading.className = "history-empty";
+  loading.textContent = "Loading…";
+  historyList.appendChild(loading);
+
+  const token = await getValidToken().catch(() => null);
+  if (!token) { loading.textContent = "Sign in to see your history."; return; }
+  let chats = [];
+  try {
+    const { payload } = await fetchCareerLaunch("/api/chats?limit=100", { headers: { "Authorization": `Bearer ${token}` } }, { fallbackMessage: "Couldn't load history" });
+    chats = payload.data?.chats || [];
+  } catch (err) {
+    loading.textContent = err.message || "Couldn't load history.";
+    return;
+  }
+  historyList.replaceChildren();
+  if (!chats.length) {
+    const empty = document.createElement("div");
+    empty.className = "history-empty";
+    empty.textContent = "No conversations yet.";
+    historyList.appendChild(empty);
+    return;
+  }
+  for (const c of chats) {
+    const item = document.createElement("div");
+    item.className = `history-item${c.chatId === chatId ? " current" : ""}`;
+    const main = document.createElement("div");
+    main.className = "history-main";
+    main.innerHTML = `<div class="history-item-title"></div><div class="history-item-preview"></div><div class="history-item-meta"></div>`;
+    main.querySelector(".history-item-title").textContent = c.title || "Conversation";
+    main.querySelector(".history-item-preview").textContent = c.preview || `${c.messageCount} messages`;
+    main.querySelector(".history-item-meta").textContent = `${c.host ? `${c.host} · ` : ""}${c.messageCount} message${c.messageCount === 1 ? "" : "s"} · ${timeAgo(c.updatedAt)}${c.chatId === chatId ? " · open here" : ""}`;
+    main.addEventListener("click", () => openHistoryChat(c.chatId));
+    const del = makeButton("btn-icon history-delete", "×", async (event) => {
+      event.stopPropagation();
+      await deleteHistoryChat(c.chatId);
+      item.remove();
+      if (!historyList.children.length) loadHistory();
+    });
+    del.title = "Delete conversation";
+    item.append(main, del);
+    historyList.appendChild(item);
+  }
+}
+
+async function openHistoryChat(id) {
+  const token = await getValidToken().catch(() => null);
+  if (!token) return;
+  try {
+    const { payload } = await fetchCareerLaunch(`/api/chats/${id}`, { headers: { "Authorization": `Bearer ${token}` } }, { fallbackMessage: "Couldn't open that conversation" });
+    const chat = payload.data?.chat;
+    if (!chat) return;
+    replayChat({
+      chatId: chat.chatId,
+      log: (chat.messages || []).map((m) => ({ kind: m.kind, text: m.text, error: m.error, textActions: m.textActions, file: m.file || null })),
+      history: chat.history || [],
+      attachments: [],
+      pendingQuestions: chat.pendingQuestions || [],
+    });
+    showHistoryView(false);
+    persistChat();
+    askInput.focus();
+  } catch (err) {
+    appendMessage("assistant", err.message || "Couldn't open that conversation.", { error: true, record: false });
+    showHistoryView(false);
+  }
+}
+
+async function deleteHistoryChat(id) {
+  const token = await getValidToken().catch(() => null);
+  if (!token) return;
+  await fetchCareerLaunch(`/api/chats/${id}`, { method: "DELETE", headers: { "Authorization": `Bearer ${token}` } }, { fallbackMessage: "Couldn't delete" }).catch(() => {});
+  if (id === chatId) startNewConversation();
+}
+
+menuHistory.addEventListener("click", () => {
+  closeMenu();
+  showHistoryView(true);
+  loadHistory();
+});
+historyBack.addEventListener("click", () => showHistoryView(false));
+historyClear.addEventListener("click", async () => {
+  if (!confirm("Delete every conversation? This can't be undone.")) return;
+  const token = await getValidToken().catch(() => null);
+  if (!token) return;
+  await fetchCareerLaunch("/api/chats", { method: "DELETE", headers: { "Authorization": `Bearer ${token}` } }, { fallbackMessage: "Couldn't clear" }).catch(() => {});
+  startNewConversation();
+  loadHistory();
 });
 
 // The page hosting this iframe always hears postMessage, even when the

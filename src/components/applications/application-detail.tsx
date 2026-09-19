@@ -74,8 +74,8 @@ export function ApplicationDetail({ jobId }: { jobId: string }) {
     try {
       await generateCL.mutateAsync(jobId);
       toast({ title: "Cover letter generated!" });
-    } catch {
-      toast({ title: "Failed to generate cover letter", variant: "destructive" });
+    } catch (err) {
+      toast({ title: "Couldn't generate the cover letter", description: err instanceof Error ? err.message : undefined, variant: "destructive" });
     }
   };
 

@@ -47,9 +47,6 @@ export async function POST(request: Request) {
       .eq("user_id", user.id)
       .single();
 
-    if (!resumeRow?.parsed_json) {
-      return NextResponse.json({ error: "No resume found" }, { status: 400 });
-    }
 
     // Fetch supplemental
     const { data: supplementalRows } = await supabase
@@ -67,21 +64,22 @@ export async function POST(request: Request) {
       job.description || "",
       job.company,
       job.title,
-      resumeRow.parsed_json as unknown as ParsedResume,
+      (resumeRow?.parsed_json ?? {}) as unknown as ParsedResume,
       supplemental,
       requestedModel,
       getModelFallbackChain(requestedModel, isPremium)
     );
 
-    // Update application with cover letter
-    await supabase
+    // Save on the application; create the application row if there isn't one yet.
+    const { data: updated } = await supabase
       .from("applications")
-      .update({
-        cover_letter: coverLetter,
-        updated_at: new Date().toISOString(),
-      })
+      .update({ cover_letter: coverLetter, updated_at: new Date().toISOString() })
       .eq("job_id", job_id)
-      .eq("user_id", user.id);
+      .eq("user_id", user.id)
+      .select("id");
+    if (!updated?.length) {
+      await supabase.from("applications").insert({ user_id: user.id, job_id, status: "draft", cover_letter: coverLetter });
+    }
 
     // Persist to MongoDB after the response is sent so it never adds latency.
     after(() =>
@@ -99,6 +97,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ cover_letter: coverLetter });
   } catch (error) {
     console.error("Cover letter generation error:", error);
-    return NextResponse.json({ error: "Failed to generate cover letter" }, { status: 500 });
+    const message = error instanceof Error && error.message ? error.message : "Failed to generate cover letter";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

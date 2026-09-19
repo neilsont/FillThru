@@ -14,7 +14,10 @@ export function useGenerateCoverLetter() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ job_id: jobId, model: selectedModel }),
       });
-      if (!res.ok) throw new Error("Failed to generate cover letter");
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error === "subscription_required" ? "Your free trial has ended — subscribe to keep generating." : body.error || "Failed to generate cover letter");
+      }
       return res.json();
     },
     onSuccess: () => {

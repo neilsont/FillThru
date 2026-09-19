@@ -51,7 +51,7 @@ export interface ChatMessage {
 }
 
 export type AssistantAction =
-  | { type: "save_job" }
+  | { type: "save_job"; title?: string; company?: string; location?: string; url?: string }
   | { type: "write_cover_letter"; notes?: string }
   | { type: "search_jobs"; keywords?: string; location?: string; jobTypes?: string[] }
   | { type: "start_autopilot"; keywords?: string; location?: string; jobTypes?: string[]; limit?: number }
@@ -87,14 +87,14 @@ JSON shape:
 }
 
 Actions you may emit:
-  { "type": "save_job" }                                   — save the job on this page to the user's tracker
+  { "type": "save_job", "title": string, "company": string } — save the job on this page to the user's tracker; when the page isn't a posting but the user names the job (or it's in OTHER OPEN TABS / an attachment), include title and company
   { "type": "write_cover_letter", "notes": string }        — generate a cover letter for the job on this page; notes = anything the user told you to emphasise
   { "type": "search_jobs", "keywords": string, "location": string, "jobTypes": ["fulltime"|"parttime"|"contract"|"temporary"|"internship"] }
   { "type": "start_autopilot", "keywords": string, "location": string, "jobTypes": [...], "limit": number } — auto-apply to matching jobs (only when the user clearly asks to apply automatically)
   { "type": "pause_autopilot" } / { "type": "resume_autopilot" } / { "type": "stop_autopilot" } — when the user says pause / resume / stop (Autopilot runs silently in the background otherwise)
   { "type": "translate_page", "target": "en" }             — translate the whole page into a language code
   { "type": "insert_text", "text": string }                — put text into the field the user last clicked
-  { "type": "set_resume", "name": string }                 — save an ATTACHED FILE as the user's résumé (only when they confirm they want that; name = the attachment's file name)
+  { "type": "set_resume", "name": string }                 — save an ATTACHED FILE as the user's resume (only when they confirm they want that; name = the attachment's file name)
   { "type": "read_tab", "id": number }                     — fetch the full text of one of OTHER OPEN TABS when its title/job summary isn't enough; you'll get the text next turn
   { "type": "update_job_status", "status": "in_progress"|"applied"|"interviewing"|"rejected"|"offer", "company": string, "title": string } — when the user says they submitted, got an interview, an offer, or a rejection (company/title identify the job if it isn't the one on this page)
 
@@ -107,10 +107,10 @@ Rules:
 6. If the user asks to translate selected text or a passage, put the translation in "reply". If they ask to translate the whole page, emit translate_page.
 7. If the user asks about themselves ("do I have React experience?") answer from WHAT YOU KNOW; if it isn't there, say so and offer to remember it.
 8. Keep replies short. When you filled fields, say how many and what you still need. Never claim you filled something you didn't put in "fill".
-9. If there is no résumé and little known about the user, that's fine — work from what they tell you and remember it.
+9. If there is no resume and little known about the user, that's fine — work from what they tell you and remember it.
 11. OTHER OPEN TABS lists the user's other browser tabs. If this page has no job posting but another tab does, use that posting (for cover letters, fit questions, filling). If a tab's title suggests it has what you need but no posting was detected, emit read_tab with its id — once — rather than guessing.
 12. PREVIOUS CONVERSATION is a chat the user had on another tab; treat it as earlier context, not as this page.
-10. ATTACHED FILES are documents the user added to this conversation (a job description, a cover-letter draft, notes, a previous application…). Use them to answer, fill, and write. If an attachment is clearly a job posting and the page has none, treat it as the job posting. Attachments are not the user's résumé unless they say so — when they do ("use this as my résumé", "yes, replace it"), emit set_resume with that file's name.`;
+10. ATTACHED FILES are documents the user added to this conversation (a job description, a cover-letter draft, notes, a previous application…). Use them to answer, fill, and write. If an attachment is clearly a job posting and the page has none, treat it as the job posting. Attachments are not the user's resume unless they say so — when they do ("use this as my resume", "yes, replace it"), emit set_resume with that file's name.`;
 
 function describeFields(fields: PageField[] = []): string {
   if (!fields.length) return "(no fillable fields detected on this page)";
@@ -162,7 +162,7 @@ function intentInstruction(intent: AssistantIntent): string {
     case "fill_form":
       return "TASK: The user clicked \"Fill out this form\". Fill every field you can from WHAT YOU KNOW (skip fields that already have a current value unless it's clearly wrong). Put anything you can't answer into \"ask\". In \"reply\", summarise what you filled and list what you need.";
     case "cover_letter":
-      return "TASK: The user clicked \"Write a cover letter\". If the page has a job title and description and you know enough about the user, emit write_cover_letter (put any emphasis the user mentioned in notes). If the job details are missing, or the résumé is missing and you know almost nothing about the user, ask for what you need instead — one short message.";
+      return "TASK: The user clicked \"Write a cover letter\". If the page has a job title and description and you know enough about the user, emit write_cover_letter (put any emphasis the user mentioned in notes). If the job details are missing, or the resume is missing and you know almost nothing about the user, ask for what you need instead — one short message.";
     default:
       return "TASK: Respond to the user's latest message. Use fill/actions when the message asks you to do something on the page.";
   }
@@ -178,11 +178,11 @@ export function buildAssistantPrompt(args: {
 }): string {
   const { intent, messages, context, resume, resumeText, facts } = args;
   const known = {
-    resume: resume ?? "(no résumé uploaded)",
+    resume: resume ?? "(no resume uploaded)",
     saved_facts: Object.keys(facts).length ? facts : "(nothing saved yet)",
   };
   const resumeExcerpt = resumeText?.trim()
-    ? `\nRÉSUMÉ TEXT (verbatim, for details the summary above may miss):\n"""${resumeText.trim().slice(0, 7000)}"""`
+    ? `\nRESUME TEXT (verbatim, for details the summary above may miss):\n"""${resumeText.trim().slice(0, 7000)}"""`
     : "";
   const transcript = messages
     .slice(-14)

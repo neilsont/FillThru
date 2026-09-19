@@ -22,7 +22,7 @@ export const metadata: Metadata = {
     default: "Fillthru — Fill out job applications with AI",
     template: "%s | Fillthru",
   },
-  description: "A Chrome assistant that fills out job applications, answers screening questions, and writes cover letters from your résumé — on any site.",
+  description: "A Chrome assistant that fills out job applications, answers screening questions, and writes cover letters from your resume — on any site.",
 };
 
 export default function RootLayout({

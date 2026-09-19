@@ -8,7 +8,6 @@ import {
   LayoutDashboard,
   User,
   FileText,
-  MessageCircleQuestion,
   History,
   ChevronLeft,
   ChevronRight,
@@ -20,8 +19,7 @@ const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/profile", label: "Profile", icon: User },
   { href: "/applications", label: "Applications", icon: FileText },
-  { href: "/questions", label: "Questions", icon: MessageCircleQuestion },
-  { href: "/history", label: "History", icon: History },
+  { href: "/history", label: "Chat history", icon: History },
 ];
 
 function NavLinks({ collapsed, onNavigate }: { collapsed?: boolean; onNavigate?: () => void }) {

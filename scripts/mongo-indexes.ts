@@ -1,4 +1,5 @@
 import { ensureGenerationIndexes } from "../src/lib/generations";
+import { ensureChatIndexes } from "../src/lib/chats";
 import { getMongoClient } from "../src/lib/mongodb";
 
 async function main() {
@@ -8,6 +9,8 @@ async function main() {
   }
 
   const names = await ensureGenerationIndexes();
+  await ensureChatIndexes();
+  console.log("chats: user_chat, user_recent");
   console.log("Ensured indexes on generations:", names.join(", "));
 
   const client = await getMongoClient();

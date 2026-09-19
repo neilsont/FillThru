@@ -21,6 +21,7 @@
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
+[hidden] { display: none !important; }
 
 html, body { height: 100%; }
 
@@ -310,6 +311,31 @@ body {
 .answer-actions .btn { flex: 1; padding: 6px 8px; font-size: 12px; }
 .msg-assistant .answer-actions { margin-top: 2px; }
 
+
+/* ── Chat history ───────────────────────────────────────────────────── */
+.history[hidden] { display: none; }
+.history-head { display: flex; align-items: center; gap: 6px; margin: 8px 0 6px; }
+.history-title { flex: 1; font-size: 14px; font-weight: 600; }
+.history-clear { border: none; background: none; color: var(--muted); font: inherit; font-size: 12px; cursor: pointer; padding: 4px 6px; border-radius: 6px; }
+.history-clear:hover { color: var(--red); background: var(--hover); }
+.history-list { display: flex; flex-direction: column; }
+.history-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 6px 9px 8px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+.history-item:hover { background: var(--hover); }
+.history-item.current { background: #eef2f7; }
+.history-main { flex: 1; min-width: 0; }
+.history-item-title { font-size: 13px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.history-item-preview { font-size: 12px; color: var(--slate); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.history-item-meta { font-size: 11px; color: var(--muted); }
+.history-delete { opacity: 0; width: 26px; height: 26px; flex-shrink: 0; }
+.history-item:hover .history-delete { opacity: 1; }
+.history-empty { padding: 20px 8px; font-size: 13px; color: var(--slate); text-align: center; }
 
 /* ── Ask box (pinned) ───────────────────────────────────────────────── */
 .ask-box {

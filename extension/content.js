@@ -746,6 +746,20 @@
     return { ok: true, changed: filled };
   }
 
+  // What a page is when it isn't a job posting — so the assistant can say so.
+  function describePageKind() {
+    const host = location.hostname;
+    const path = location.pathname;
+    if (/myworkdayjobs\.com|myworkdaysite\.com/.test(host)) {
+      if (/userHome/i.test(path)) return "workday_home";
+      if (/\/apply|\/task\//i.test(path)) return "workday_application";
+      return "workday_search";
+    }
+    if (/indeed\.com/.test(host) && /\/jobs/.test(path)) return "search_results";
+    if (/linkedin\.com/.test(host) && /\/jobs\/(search|collections)/.test(path)) return "search_results";
+    return "unknown";
+  }
+
   // ── Detect CAPTCHAs and blockers ───────────────────────────────────────────
 
   function detectBlockers() {
@@ -885,6 +899,20 @@
         const jk = new URLSearchParams(window.location.search).get("jk");
         if (jk) jobUrl = `https://www.indeed.com/viewjob?jk=${jk}`;
       }
+    } else if (/myworkdayjobs\.com|myworkdaysite\.com/.test(host)) {
+      // ── Workday ─────────────────────────────────────────────────────────
+      // Only real postings (/job/…) count; the candidate home, search, and
+      // application task pages aren't jobs.
+      if (!/\/job\//.test(location.pathname)) return null;
+      title = document.querySelector('[data-automation-id="jobPostingHeader"]')?.innerText?.trim() || document.querySelector("h1")?.innerText?.trim() || "";
+      description = document.querySelector('[data-automation-id="jobPostingDescription"]')?.innerText?.trim() || "";
+      location = document.querySelector('[data-automation-id="locations"]')?.innerText?.replace(/^locations?/i, "").trim() || "";
+      company =
+        document.querySelector('meta[property="og:site_name"]')?.content ||
+        document.querySelector('meta[name="application-name"]')?.content ||
+        (document.title.match(/(?:careers?|jobs?) (?:at|@) ([^|–-]+)/i) || [])[1]?.trim() ||
+        (document.title.split(/\s[-|–]\s/).pop() || "").trim() ||
+        "";
     } else {
       // ── Generic / Greenhouse / Skillsoft ──────────────────────────────────
       title =
@@ -1791,7 +1819,7 @@
     if (message.type === "CL_EXTRACT_JOB") {
       try {
         const info = extractJobInfo();
-        sendResponse(info);
+        sendResponse(info || { pageKind: describePageKind() });
       } catch {
         sendResponse(null);
       }

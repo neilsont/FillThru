@@ -1,4 +1,4 @@
-// Text extraction for uploaded documents (résumés and chat attachments).
+// Text extraction for uploaded documents (resumes and chat attachments).
 // Text-based files are parsed locally; images and scanned PDFs are transcribed
 // by Gemini (multimodal), so screenshots and photos of documents work too.
 

@@ -3,7 +3,6 @@
 import { Menu } from "lucide-react";
 import { useUIStore } from "@/stores/ui-store";
 import { Breadcrumbs } from "@/components/shared/breadcrumbs";
-import { NotificationBell } from "./notification-bell";
 import { UserMenu } from "./user-menu";
 
 export function Header({ email }: { email: string }) {
@@ -20,7 +19,6 @@ export function Header({ email }: { email: string }) {
       </button>
       <Breadcrumbs />
       <div className="flex items-center gap-1 ml-auto">
-        <NotificationBell />
         <UserMenu email={email} />
       </div>
     </header>

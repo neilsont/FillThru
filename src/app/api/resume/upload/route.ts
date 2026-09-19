@@ -54,7 +54,7 @@ export async function POST(request: Request) {
     const kind = detectDocumentKind(file);
     if (!kind || kind === "text") {
       return NextResponse.json(
-        { error: "Please upload your résumé as a PDF, Word document, or image (PNG/JPG)." },
+        { error: "Please upload your resume as a PDF, Word document, or image (PNG/JPG)." },
         { status: 400, headers: CORS_HEADERS }
       );
     }

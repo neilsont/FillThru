@@ -22,7 +22,7 @@ export async function OPTIONS() {
 const MAX_BYTES = 15 * 1024 * 1024;
 const MAX_CHARS = 40_000;
 
-// Cheap heuristic so the panel can offer "use this as your résumé" without a model call.
+// Cheap heuristic so the panel can offer "use this as your resume" without a model call.
 function looksLikeResume(text: string): boolean {
   if (text.length > 20_000) return false;
   const t = text.toLowerCase();
