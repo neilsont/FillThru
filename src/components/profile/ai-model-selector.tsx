@@ -1,15 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { useAIStore } from "@/stores/ai-store";
 import { AI_MODELS } from "@/lib/ai/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { Bot, CheckCircle2, Lock, Sparkles } from "lucide-react";
-import { useToast } from "@/components/ui/toast";
-import { useSubscription } from "@/hooks/use-subscription";
+import { Bot, CheckCircle2, Lock } from "lucide-react";
 
 function ProviderIcon({ provider, className }: { provider: string; className?: string }) {
   if (provider === "google") {
@@ -52,7 +48,6 @@ function ProviderIcon({ provider, className }: { provider: string; className?: s
 
 export function AIModelSelector() {
   const { selectedModel, setModel } = useAIStore();
-  const { isPremium, upgrading, handleUpgrade } = useSubscription();
 
   return (
     <Card className="mt-4 border-border/60">
@@ -62,60 +57,19 @@ export function AIModelSelector() {
           AI Model
         </CardTitle>
         <CardDescription className="text-xs">
-          Choose which AI powers resume parsing, cover letters, and field mapping. Free-tier models work immediately.
+          Choose which AI powers resume parsing, answers, and cover letters. If one is busy, we fall back to the next automatically.
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-3">
-        <div className="space-y-2">
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground px-1">Free — works now</p>
-          {AI_MODELS.filter((m) => m.free).map((model) => (
-            <ModelOption
-              key={model.id}
-              model={model}
-              selected={model.id === selectedModel}
-              locked={false}
-              onSelect={() => setModel(model.id)}
-            />
-          ))}
-
-          <div className="flex items-center justify-between px-1 pt-2">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-              Premium — advanced models
-            </p>
-            {!isPremium && (
-              <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-accent/40 text-accent">
-                $9.99/mo
-              </Badge>
-            )}
-            {isPremium && (
-              <Badge variant="default" className="text-[10px] px-1.5 py-0 bg-accent">
-                Active
-              </Badge>
-            )}
-          </div>
-
-          {AI_MODELS.filter((m) => !m.free).map((model) => (
-            <ModelOption
-              key={model.id}
-              model={model}
-              selected={model.id === selectedModel}
-              locked={!isPremium}
-              onSelect={() => isPremium && setModel(model.id)}
-            />
-          ))}
-
-          {!isPremium && (
-            <Button
-              size="sm"
-              className="w-full mt-2 rounded-lg bg-accent hover:bg-accent/90 text-white font-semibold"
-              onClick={handleUpgrade}
-              disabled={upgrading}
-            >
-              <Sparkles className="h-3.5 w-3.5 mr-1.5" />
-              {upgrading ? "Redirecting…" : "Upgrade to Premium"}
-            </Button>
-          )}
-        </div>
+      <CardContent className="space-y-2">
+        {AI_MODELS.filter((m) => m.free).map((model) => (
+          <ModelOption
+            key={model.id}
+            model={model}
+            selected={model.id === selectedModel}
+            locked={false}
+            onSelect={() => setModel(model.id)}
+          />
+        ))}
       </CardContent>
     </Card>
   );

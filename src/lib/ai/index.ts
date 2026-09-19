@@ -1,5 +1,5 @@
 import type { AIModel } from "./types";
-import { AI_MODELS, DEFAULT_MODEL } from "./types";
+import { AI_MODELS, DEFAULT_MODEL, normalizeModel } from "./types";
 import type { ParsedResume } from "@/types/resume";
 import type { FieldMapping } from "@/types/application";
 
@@ -85,26 +85,31 @@ async function anthropicChat(systemPrompt: string, userPrompt: string, maxTokens
   return block.text.trim();
 }
 
+async function geminiChat(modelName: string, systemPrompt: string, userPrompt: string, maxTokens = 1024): Promise<string> {
+  const { GoogleGenerativeAI } = await import("@google/generative-ai");
+  // Vercel has this as GEMINI_API_KEY; local .env uses GOOGLE_AI_STUDIO_API_KEY.
+  const key = process.env.GOOGLE_AI_STUDIO_API_KEY || process.env.GEMINI_API_KEY;
+  if (!key) throw new Error("GOOGLE_AI_STUDIO_API_KEY (or GEMINI_API_KEY) is not set");
+  const genAI = new GoogleGenerativeAI(key);
+  const m = genAI.getGenerativeModel({
+    model: modelName,
+    systemInstruction: systemPrompt,
+    generationConfig: { maxOutputTokens: maxTokens },
+  });
+  const result = await m.generateContent(userPrompt);
+  return result.response.text().trim();
+}
+
 async function chat(model: AIModel, systemPrompt: string, userPrompt: string, maxTokens = 1024): Promise<string> {
   switch (model) {
-    case "groq/llama-3.3-70b-versatile": {
-      const key = process.env.GROQ_AI_API_KEY;
-      if (!key) throw new Error("GROQ_AI_API_KEY is not set");
-      return openaiCompatChat(key, "https://api.groq.com/openai/v1", "llama-3.3-70b-versatile", systemPrompt, userPrompt, maxTokens);
-    }
-    case "openrouter/qwen3.6-plus": {
+    case "gemini-3.5-flash-lite":
+      return geminiChat("gemini-3.5-flash-lite", systemPrompt, userPrompt, maxTokens);
+    case "gemini-3.5-flash":
+      return geminiChat("gemini-3.5-flash", systemPrompt, userPrompt, maxTokens);
+    case "openrouter/deepseek-v4-flash": {
       const key = process.env.OPEN_ROUTER_API_KEY;
       if (!key) throw new Error("OPEN_ROUTER_API_KEY is not set");
-      return openaiCompatChat(key, "https://openrouter.ai/api/v1", "qwen/qwen3.6-plus:free", systemPrompt, userPrompt, maxTokens);
-    }
-    case "gemini-2.0-flash": {
-      const { GoogleGenerativeAI } = await import("@google/generative-ai");
-      const key = process.env.GOOGLE_AI_STUDIO_API_KEY;
-      if (!key) throw new Error("GOOGLE_AI_STUDIO_API_KEY is not set");
-      const genAI = new GoogleGenerativeAI(key);
-      const m = genAI.getGenerativeModel({ model: "gemini-2.0-flash", systemInstruction: systemPrompt });
-      const result = await m.generateContent(userPrompt);
-      return result.response.text().trim();
+      return openaiCompatChat(key, "https://openrouter.ai/api/v1", "deepseek/deepseek-v4-flash-0731:free", systemPrompt, userPrompt, maxTokens);
     }
     case "gpt-4o-mini": {
       const key = process.env.OPENAI_API_KEY;
@@ -118,7 +123,7 @@ async function chat(model: AIModel, systemPrompt: string, userPrompt: string, ma
   }
 }
 
-function stripCodeFences(text: string): string {
+export function stripCodeFences(text: string): string {
   return text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
 }
 
@@ -127,24 +132,24 @@ function uniqueModels(models: AIModel[]): AIModel[] {
 }
 
 export function getModelFallbackChain(
-  preferredModel: AIModel,
+  preferredModel: AIModel | string,
   includePaidModels = false
 ): AIModel[] {
   const fallbackPool = AI_MODELS
     .filter((config) => includePaidModels || config.free)
     .map((config) => config.id);
 
-  return uniqueModels([preferredModel, ...fallbackPool]);
+  return uniqueModels([normalizeModel(preferredModel), ...fallbackPool]);
 }
 
-async function chatWithFallback(
+export async function chatWithFallback(
   model: AIModel,
   systemPrompt: string,
   userPrompt: string,
   fallbackModels: AIModel[] = [],
   maxTokens = 1024
 ): Promise<string> {
-  const candidates = uniqueModels([model, ...fallbackModels]);
+  const candidates = uniqueModels([normalizeModel(model), ...fallbackModels]);
   let lastError: unknown = null;
 
   for (const candidate of candidates) {
@@ -186,12 +191,13 @@ export async function generateCoverLetter(
   resume: ParsedResume,
   supplemental: Record<string, string>,
   model: AIModel = DEFAULT_MODEL,
-  fallbackModels: AIModel[] = []
+  fallbackModels: AIModel[] = [],
+  notes = ""
 ): Promise<string> {
   return chatWithFallback(
     model,
     COVER_LETTER_SYSTEM,
-    `Write a cover letter for the following job application.\n\nJOB TITLE: ${jobTitle}\nCOMPANY: ${companyName}\n\nJOB DESCRIPTION:\n${jobDescription}\n\nCANDIDATE RESUME DATA:\n${JSON.stringify(resume, null, 2)}\n\nADDITIONAL CANDIDATE INFO:\n${JSON.stringify(supplemental, null, 2)}`,
+    `Write a cover letter for the following job application.\n\nJOB TITLE: ${jobTitle}\nCOMPANY: ${companyName}\n\nJOB DESCRIPTION:\n${jobDescription}\n\nCANDIDATE RESUME DATA:\n${JSON.stringify(resume, null, 2)}\n\nADDITIONAL CANDIDATE INFO:\n${JSON.stringify(supplemental, null, 2)}${notes ? `\n\nTHE CANDIDATE ALSO SAID (use this, it overrides the resume where they conflict):\n${notes}` : ""}`,
     fallbackModels
   );
 }
