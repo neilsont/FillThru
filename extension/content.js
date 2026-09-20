@@ -834,7 +834,7 @@
     if (/linkedin\.com/.test(host) && /my-items|applied/.test(location.href)) return "applications_list";
     if (/indeed\.com/.test(host) && /myjobs/.test(path)) return "applications_list";
     if (findApplicationsSection()) return "applications_list";
-    if (/linkedin\.com/.test(host) && /\/jobs\/(search|collections)/.test(path)) return "search_results";
+    if (/linkedin\.com/.test(host) && /\/jobs\/(search|collections)/.test(path) && !/currentJobId=\d+/.test(location.search)) return "search_results";
     return "unknown";
   }
 
@@ -922,9 +922,55 @@
   // ── Extract job info from the current page ────────────────────────────────
   // Handles Indeed's split-panel layout, Indeed Apply modal, and generic pages
 
+  // Most ATSes (Ashby, Greenhouse, Lever, LinkedIn, Workday, SmartRecruiters…)
+  // embed schema.org JobPosting JSON-LD. It's exact, so it wins over heuristics.
+  function jobPostingFromJsonLd() {
+    for (const script of document.querySelectorAll('script[type="application/ld+json"]')) {
+      let data;
+      try { data = JSON.parse(script.textContent || ""); } catch { continue; }
+      const nodes = [];
+      const walk = (n) => { if (!n || typeof n !== "object") return; if (Array.isArray(n)) return n.forEach(walk); nodes.push(n); if (n["@graph"]) walk(n["@graph"]); };
+      walk(data);
+      const posting = nodes.find((n) => String(n["@type"] || "").toLowerCase().includes("jobposting"));
+      if (!posting) continue;
+      const org = posting.hiringOrganization;
+      const loc = posting.jobLocation;
+      const locNode = Array.isArray(loc) ? loc[0] : loc;
+      const addr = locNode?.address;
+      const location = typeof addr === "string" ? addr : [addr?.addressLocality, addr?.addressRegion, addr?.addressCountry].filter(Boolean).join(", ");
+      const html = String(posting.description || "");
+      const div = document.createElement("div");
+      div.innerHTML = html;
+      return {
+        title: normalizeText(posting.title || ""),
+        company: normalizeText((typeof org === "string" ? org : org?.name) || ""),
+        location: normalizeText(location || (posting.jobLocationType === "TELECOMMUTE" ? "Remote" : "")),
+        description: normalizeText(div.innerText || div.textContent || "").slice(0, 6000),
+        url: posting.url || location.href,
+      };
+    }
+    return null;
+  }
+
+  // The visible heading nearest the top of the page — what a human would call the title.
+  function topHeading() {
+    const candidates = Array.from(document.querySelectorAll("h1, h2"))
+      .filter((h) => isVisible(h))
+      .map((h) => ({ el: h, top: h.getBoundingClientRect().top + window.scrollY, text: normalizeText(h.innerText || h.textContent || "") }))
+      .filter((c) => c.text.length >= 3 && c.text.length <= 140 && c.top < 1500)
+      .sort((a, b) => (a.el.tagName === b.el.tagName ? a.top - b.top : a.el.tagName === "H1" ? -1 : 1));
+    return candidates[0]?.text || "";
+  }
+
   function extractJobInfo() {
     // Pages that list applications or search results aren't postings.
     if (describePageKind() !== "unknown") return null;
+
+    const structured = jobPostingFromJsonLd();
+    if (structured?.title) {
+      if (!structured.company) structured.company = companyFromPage() || "";
+      if (structured.company) return structured;
+    }
     const host = window.location.hostname;
     const isIndeed = host.includes("indeed.com");
 
@@ -979,6 +1025,20 @@
         const jk = new URLSearchParams(window.location.search).get("jk");
         if (jk) jobUrl = `https://www.indeed.com/viewjob?jk=${jk}`;
       }
+    } else if (/linkedin\.com/.test(host)) {
+      // ── LinkedIn (job view page, or search page with a job selected) ──────
+      const pane = document.querySelector(".jobs-search__job-details, .jobs-details, .job-view-layout") || document;
+      title = pane.querySelector(".job-details-jobs-unified-top-card__job-title, .jobs-unified-top-card__job-title, .top-card-layout__title, h1")?.innerText?.trim() || "";
+      company = pane.querySelector(".job-details-jobs-unified-top-card__company-name, .jobs-unified-top-card__company-name, .topcard__org-name-link, a[href*='/company/']")?.innerText?.trim() || "";
+      location = pane.querySelector(".job-details-jobs-unified-top-card__bullet, .jobs-unified-top-card__bullet, .topcard__flavor--bullet")?.innerText?.trim() || "";
+      description = pane.querySelector("#job-details, .jobs-description__content, .description__text")?.innerText?.trim() || "";
+      const jobId = new URLSearchParams(location.search).get("currentJobId") || (location.pathname.match(/\/jobs\/view\/(\d+)/) || [])[1];
+      if (jobId) jobUrl = `https://www.linkedin.com/jobs/view/${jobId}/`;
+    } else if (/ashbyhq\.com/.test(host)) {
+      // ── Ashby ───────────────────────────────────────────────────────────
+      title = topHeading();
+      company = document.querySelector('meta[property="og:site_name"]')?.content || (location.pathname.split("/")[1] || "").replace(/-/g, " ") || "";
+      description = document.querySelector('[class*="jobPosting" i] [class*="description" i], [class*="description" i]')?.innerText?.trim() || "";
     } else if (/myworkdayjobs\.com|myworkdaysite\.com/.test(host)) {
       // ── Workday ─────────────────────────────────────────────────────────
       // Only real postings (/job/…) count; the candidate home, search, and
@@ -998,9 +1058,9 @@
       title =
         document.querySelector("h1.app-title")?.innerText?.trim() ||
         document.querySelector("h1.neo--jobheading__title")?.innerText?.trim() ||
-        document.querySelector("h1")?.innerText?.trim() ||
         document.querySelector(".job-title")?.innerText?.trim() ||
-        document.querySelector('[class*="title" i]')?.innerText?.trim() || 
+        topHeading() ||
+        document.querySelector('meta[property="og:title"]')?.content?.trim() ||
         "";
 
       company =
@@ -1008,7 +1068,7 @@
         document.querySelector(".company-name")?.innerText?.trim() ||
         document.querySelector(".company")?.innerText?.trim() ||
         document.querySelector(".siteHeader__brand img")?.alt ||
-        document.querySelector('[class*="company" i]')?.innerText?.trim() ||
+        companyFromPage() ||
         "";
 
       description =
@@ -1028,10 +1088,11 @@
       const el = document.querySelector('[class*="company"], [class*="employer"], [class*="Employer"], [data-testid="company-name"]');
       company = el?.textContent?.trim() || "";
       
-      // Fallback: Try to get company from title if it's "Job Title - Company Name"
-      if (!company && document.title.includes(" - ")) {
-        const parts = document.title.split(" - ");
-        if (parts.length > 1) company = parts[parts.length - 1].trim();
+      // "Job Title - Company" / "Job Title | Company" / "Job Title at Company" in the
+      // document title — but only when the trailing part isn't part of the job title itself.
+      if (!company) {
+        const m = document.title.match(/^(.*?)\s+(?:at|@)\s+([^|–-]+)$/i) || document.title.match(/^(.*)\s[-|–]\s([^-|–]+)$/);
+        if (m && !normalizeText(title).toLowerCase().includes(normalizeText(m[2]).toLowerCase())) company = m[2].trim();
       }
     }
     if (!location) {

@@ -220,11 +220,16 @@ export async function mapApplicationFields(
     model,
     FIELD_MAPPER_SYSTEM,
     `JOB DESCRIPTION:\n${jobDescription}\n\nCANDIDATE RESUME:\n${JSON.stringify(resume, null, 2)}\n\nSUPPLEMENTAL ANSWERS:\n${JSON.stringify(supplemental, null, 2)}`,
-    fallbackModels
+    fallbackModels,
+    4096 // a dozen mappings with labels easily passes 1k tokens; a cut-off reply is unparseable
   );
   const jsonStr = text.match(/```(?:json)?\s*([\s\S]*?)```/)?.[1] ?? text;
-  const parsed = JSON.parse(stripCodeFences(jsonStr));
-  return parsed.mappings as FieldMapping[];
+  let cleaned = stripCodeFences(jsonStr);
+  const start = cleaned.indexOf("{");
+  const end = cleaned.lastIndexOf("}");
+  if (start >= 0 && end > start) cleaned = cleaned.slice(start, end + 1);
+  const parsed = JSON.parse(cleaned);
+  return (Array.isArray(parsed.mappings) ? parsed.mappings : []) as FieldMapping[];
 }
 
 const CUSTOM_ANSWER_SYSTEM = `You are an expert AI Career Copilot. You are helping a user fill out a specific job application question.

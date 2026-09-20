@@ -59,13 +59,23 @@ export async function POST(request: NextRequest) {
     let jobId: string;
     const { data: existingJob } = await supabase
       .from("jobs")
-      .select("id")
+      .select("id, title, company")
       .eq("user_id", user.id)
       .eq("url", url)
       .maybeSingle();
 
     if (existingJob) {
       jobId = existingJob.id;
+      // Same posting saved again with better details (e.g. the user corrected a
+      // mis-extracted title): update it rather than leaving the wrong record.
+      const corrections: Record<string, unknown> = {};
+      if (title && title !== existingJob.title) corrections.title = title;
+      if (company && company !== existingJob.company) corrections.company = company;
+      if (location) corrections.location = location;
+      if (description) corrections.description = description;
+      if (Object.keys(corrections).length) {
+        await supabase.from("jobs").update({ ...corrections, updated_at: new Date().toISOString() }).eq("id", jobId).eq("user_id", user.id);
+      }
     } else {
       const { data: newJob, error: jobError } = await supabase
         .from("jobs")

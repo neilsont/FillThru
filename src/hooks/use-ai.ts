@@ -37,7 +37,10 @@ export function useMapFields() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...data, model: selectedModel }),
       });
-      if (!res.ok) throw new Error("Failed to map fields");
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error === "subscription_required" ? "Your free trial has ended — subscribe to keep using AI features." : body.error || "Failed to map fields");
+      }
       return res.json();
     },
     onSuccess: () => {

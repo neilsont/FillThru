@@ -47,9 +47,6 @@ export async function POST(request: Request) {
       .eq("user_id", user.id)
       .single();
 
-    if (!resumeRow?.parsed_json) {
-      return NextResponse.json({ error: "No resume found" }, { status: 400 });
-    }
 
     // Fetch supplemental
     const { data: supplementalRows } = await supabase
@@ -65,7 +62,7 @@ export async function POST(request: Request) {
     const startedAt = Date.now();
     const mappings = await mapApplicationFields(
       job.description || "",
-      resumeRow.parsed_json as unknown as ParsedResume,
+      (resumeRow?.parsed_json ?? {}) as unknown as ParsedResume,
       supplemental,
       requestedModel,
       getModelFallbackChain(requestedModel, isPremium)
@@ -111,6 +108,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ mappings });
   } catch (error) {
     console.error("Field mapping error:", error);
-    return NextResponse.json({ error: "Failed to map fields" }, { status: 500 });
+    const message = error instanceof Error && error.message ? error.message : "Failed to map fields";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

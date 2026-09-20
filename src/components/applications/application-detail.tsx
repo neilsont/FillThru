@@ -83,8 +83,8 @@ export function ApplicationDetail({ jobId }: { jobId: string }) {
     try {
       await mapFields.mutateAsync({ job_id: jobId });
       toast({ title: "Fields mapped!" });
-    } catch {
-      toast({ title: "Failed to map fields", variant: "destructive" });
+    } catch (err) {
+      toast({ title: "Couldn't map the fields", description: err instanceof Error ? err.message : undefined, variant: "destructive" });
     }
   };
 

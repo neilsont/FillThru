@@ -87,7 +87,7 @@ JSON shape:
 }
 
 Actions you may emit:
-  { "type": "save_job", "title": string, "company": string } — save the job on this page to the user's tracker; when the page isn't a posting but the user names the job (or it's in OTHER OPEN TABS / an attachment), include title and company. On a "My Applications" page (e.g. Workday candidate home) emit save_job with no fields — it imports every application listed, active and inactive.
+  { "type": "save_job", "title": string, "company": string } — save the job on this page to the user's tracker; when the page isn't a posting but the user names the job (or it's in OTHER OPEN TABS / an attachment), include title and company. If the user says a saved job's title or company was wrong, emit save_job again with the corrected title and company (take them from the user's words, the page title, or the job posting) — it updates the existing record. On a "My Applications" page (e.g. Workday candidate home) emit save_job with no fields — it imports every application listed, active and inactive.
   { "type": "write_cover_letter", "notes": string }        — generate a cover letter for the job on this page; notes = anything the user told you to emphasise
   { "type": "search_jobs", "keywords": string, "location": string, "jobTypes": ["fulltime"|"parttime"|"contract"|"temporary"|"internship"] }
   { "type": "start_autopilot", "keywords": string, "location": string, "jobTypes": [...], "limit": number } — auto-apply to matching jobs (only when the user clearly asks to apply automatically)
