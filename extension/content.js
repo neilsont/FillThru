@@ -937,16 +937,16 @@
       const loc = posting.jobLocation;
       const locNode = Array.isArray(loc) ? loc[0] : loc;
       const addr = locNode?.address;
-      const location = typeof addr === "string" ? addr : [addr?.addressLocality, addr?.addressRegion, addr?.addressCountry].filter(Boolean).join(", ");
+      const where = typeof addr === "string" ? addr : [addr?.addressLocality, addr?.addressRegion, addr?.addressCountry].filter(Boolean).join(", ");
       const html = String(posting.description || "");
       const div = document.createElement("div");
       div.innerHTML = html;
       return {
         title: normalizeText(posting.title || ""),
         company: normalizeText((typeof org === "string" ? org : org?.name) || ""),
-        location: normalizeText(location || (posting.jobLocationType === "TELECOMMUTE" ? "Remote" : "")),
+        location: normalizeText(where || (posting.jobLocationType === "TELECOMMUTE" ? "Remote" : "")),
         description: normalizeText(div.innerText || div.textContent || "").slice(0, 6000),
-        url: posting.url || location.href,
+        url: posting.url || window.location.href,
       };
     }
     return null;
@@ -996,7 +996,7 @@
     const host = window.location.hostname;
     const isIndeed = host.includes("indeed.com");
 
-    let title = "", company = "", location = "", description = "", jobUrl = window.location.href;
+    let title = "", company = "", jobLocation = "", description = "", jobUrl = window.location.href;
 
     if (isIndeed) {
       // ── Indeed job search results OR Indeed Apply ─────────────────────────
@@ -1026,7 +1026,7 @@
         document.querySelector('[data-testid="job-location"]') ||
         document.querySelector('[data-testid="inlineHeader-companyLocation"]') ||
         document.querySelector(".jobsearch-JobInfoHeader-subtitle [class*='location']");
-      location = locationEl?.textContent?.trim() || "";
+      jobLocation = locationEl?.textContent?.trim() || "";
 
       // Job description text
       const descEl =
@@ -1052,23 +1052,23 @@
       const pane = document.querySelector(".jobs-search__job-details, .jobs-details, .job-view-layout") || document;
       title = pane.querySelector(".job-details-jobs-unified-top-card__job-title, .jobs-unified-top-card__job-title, .top-card-layout__title, h1")?.innerText?.trim() || "";
       company = pane.querySelector(".job-details-jobs-unified-top-card__company-name, .jobs-unified-top-card__company-name, .topcard__org-name-link, a[href*='/company/']")?.innerText?.trim() || "";
-      location = pane.querySelector(".job-details-jobs-unified-top-card__bullet, .jobs-unified-top-card__bullet, .topcard__flavor--bullet")?.innerText?.trim() || "";
+      jobLocation = pane.querySelector(".job-details-jobs-unified-top-card__bullet, .jobs-unified-top-card__bullet, .topcard__flavor--bullet")?.innerText?.trim() || "";
       description = pane.querySelector("#job-details, .jobs-description__content, .description__text")?.innerText?.trim() || "";
-      const jobId = new URLSearchParams(location.search).get("currentJobId") || (location.pathname.match(/\/jobs\/view\/(\d+)/) || [])[1];
+      const jobId = new URLSearchParams(window.location.search).get("currentJobId") || (window.location.pathname.match(/\/jobs\/view\/(\d+)/) || [])[1];
       if (jobId) jobUrl = `https://www.linkedin.com/jobs/view/${jobId}/`;
     } else if (/ashbyhq\.com/.test(host)) {
       // ── Ashby ───────────────────────────────────────────────────────────
       title = topHeading();
-      company = document.querySelector('meta[property="og:site_name"]')?.content || (location.pathname.split("/")[1] || "").replace(/-/g, " ") || "";
+      company = document.querySelector('meta[property="og:site_name"]')?.content || (window.location.pathname.split("/")[1] || "").replace(/-/g, " ") || "";
       description = document.querySelector('[class*="jobPosting" i] [class*="description" i], [class*="description" i]')?.innerText?.trim() || "";
     } else if (/myworkdayjobs\.com|myworkdaysite\.com/.test(host)) {
       // ── Workday ─────────────────────────────────────────────────────────
       // Only real postings (/job/…) count; the candidate home, search, and
       // application task pages aren't jobs.
-      if (!/\/job\//.test(location.pathname)) return null;
+      if (!/\/job\//.test(window.location.pathname)) return null;
       title = document.querySelector('[data-automation-id="jobPostingHeader"]')?.innerText?.trim() || document.querySelector("h1")?.innerText?.trim() || "";
       description = document.querySelector('[data-automation-id="jobPostingDescription"]')?.innerText?.trim() || "";
-      location = document.querySelector('[data-automation-id="locations"]')?.innerText?.replace(/^locations?/i, "").trim() || "";
+      jobLocation = document.querySelector('[data-automation-id="locations"]')?.innerText?.replace(/^locations?/i, "").trim() || "";
       company =
         document.querySelector('meta[property="og:site_name"]')?.content ||
         document.querySelector('meta[name="application-name"]')?.content ||
@@ -1117,9 +1117,9 @@
         if (m && !normalizeText(title).toLowerCase().includes(normalizeText(m[2]).toLowerCase())) company = m[2].trim();
       }
     }
-    if (!location) {
+    if (!jobLocation) {
       const el = document.querySelector('[class*="location"], [class*="Location"]');
-      location = el?.textContent?.trim() || "";
+      jobLocation = el?.textContent?.trim() || "";
     }
 
     // Clean up title if it contains company info (e.g. "Software Engineer - Skillsoft")
@@ -1140,7 +1140,7 @@
     }
 
     if (!title || !company) return null;
-    return { title, company, location, description, url: jobUrl };
+    return { title, company, location: jobLocation, description, url: jobUrl };
   }
 
   // ── Standard HTML autocomplete → field name map ───────────────────────────
@@ -1987,8 +1987,11 @@
       try {
         const info = extractJobInfo();
         sendResponse(info || { pageKind: describePageKind() });
-      } catch {
-        sendResponse(null);
+      } catch (err) {
+        // A bug here must not read as "no posting": say what happened and let the
+        // panel fall back to asking for the title.
+        console.error("[Fillthru] job extraction failed:", err);
+        sendResponse({ pageKind: describePageKind(), error: String(err?.message || err) });
       }
       return true;
     }
