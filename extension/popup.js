@@ -923,6 +923,9 @@ async function saveCurrentJob(token, given = null) {
   if ((!info?.title || !info?.url) && given?.title) {
     const tab = await getTabInfo().catch(() => null);
     info = { title: given.title, company: given.company || "", location: given.location || "", description: given.description || "", url: given.url || tab?.url || "" };
+  } else if (info && given) {
+    // The user (via the assistant) corrected details: their words win, the page fills the rest.
+    for (const k of ["title", "company", "location"]) if (given[k]) info[k] = given[k];
   }
   if (!info?.title || !info?.url) return noPostingMessage();
   const result = await saveJobToCareerLaunch(token, info);

@@ -952,6 +952,28 @@
     return null;
   }
 
+  const EEO_HEADING = /voluntary self[- ]identification|race and ethnicity|veteran status|disability status|equal employment opportunity|eeo|demographic/i;
+
+  // The job posting's own text: paragraphs and bullets in document order, ending
+  // where the application form (or its EEO/self-identification boilerplate) begins.
+  function postingBodyText(limit = 6000) {
+    const root = document.querySelector("main") || document.body;
+    const parts = [];
+    let length = 0;
+    for (const el of root.querySelectorAll("p, li, h2, h3, h4")) {
+      if (el.closest(`form, #${OVERLAY_ROOT_ID}, nav, footer`)) break;
+      const text = normalizeText(el.innerText || el.textContent || "");
+      if (!text) continue;
+      if (/^H[2-4]$/.test(el.tagName) && EEO_HEADING.test(text)) break;
+      if (/^H[2-4]$/.test(el.tagName) && parts.length === 0 && text === normalizeText(topHeading())) continue; // the title itself
+      if (el.tagName === "LI" && el.parentElement?.closest("li")) continue; // nested duplicates
+      parts.push(text);
+      length += text.length;
+      if (length > limit) break;
+    }
+    return parts.join("\n").slice(0, limit);
+  }
+
   // The visible heading nearest the top of the page — what a human would call the title.
   function topHeading() {
     const candidates = Array.from(document.querySelectorAll("h1, h2"))
@@ -1111,11 +1133,10 @@
       .replace(/\s*[-|–]\s*(indeed|linkedin|glassdoor|google jobs?)$/i, "")
       .trim();
 
-    // Fallback for description: get any large text block if id failed
-    if (!description || description.length < 100) {
-      const main = document.querySelector("main") || document.body;
-      const paragraphs = Array.from(main.querySelectorAll("p, li")).map(p => p.textContent.trim());
-      description = paragraphs.join("\n").slice(0, 3000);
+    // Fallback for description: the posting body, not whatever "description"-classed
+    // element happens to exist (EEO definitions under the form used to win here).
+    if (!description || description.length < 100 || EEO_HEADING.test(description.slice(0, 200))) {
+      description = postingBodyText();
     }
 
     if (!title || !company) return null;
