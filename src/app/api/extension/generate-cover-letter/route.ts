@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: CORS_HEADERS });
     }
 
-    const { jobTitle, companyName, jobDescription, notes = "", model = DEFAULT_MODEL } = await request.json();
+    const { jobTitle, companyName, jobDescription, jobUrl = "", notes = "", model = DEFAULT_MODEL } = await request.json();
     if (!jobTitle || !companyName || !jobDescription) {
       return NextResponse.json({ error: "Missing job details" }, { status: 400, headers: CORS_HEADERS });
     }
@@ -84,6 +84,17 @@ export async function POST(request: NextRequest) {
       getModelFallbackChain(requestedModel, isPremium),
       typeof notes === "string" ? notes.slice(0, 2000) : ""
     );
+
+    // Keep a copy on the tracker when this job is saved there, so the letter
+    // shows on the job's page on the website too.
+    if (typeof jobUrl === "string" && jobUrl) {
+      const { data: job } = await supabase.from("jobs").select("id").eq("user_id", user.id).eq("url", jobUrl).maybeSingle();
+      if (job) {
+        const now = new Date().toISOString();
+        const { data: updated } = await supabase.from("applications").update({ cover_letter: coverLetter, updated_at: now }).eq("user_id", user.id).eq("job_id", job.id).select("id");
+        if (!updated?.length) await supabase.from("applications").insert({ user_id: user.id, job_id: job.id, status: "draft", cover_letter: coverLetter });
+      }
+    }
 
     // Persist to MongoDB after the response is sent so it never adds latency.
     after(() =>

@@ -978,7 +978,7 @@ async function writeCoverLetter(token, notes = "") {
   const { payload } = await fetchCareerLaunch("/api/extension/generate-cover-letter", {
     method: "POST",
     headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-    body: JSON.stringify({ jobTitle: info.title, companyName: info.company, jobDescription: info.description, notes }),
+    body: JSON.stringify({ jobTitle: info.title, companyName: info.company, jobDescription: info.description, jobUrl: info.url || "", notes }),
   }, {
     fallbackMessage: "Generation failed",
     timeoutMs: 60000,
