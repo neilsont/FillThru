@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { useUIStore } from "@/stores/ui-store";
 import {
   LayoutDashboard,
+  MessageSquare,
   User,
   FileText,
   History,
@@ -17,6 +18,7 @@ import {
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/chat", label: "Chat", icon: MessageSquare },
   { href: "/profile", label: "Profile", icon: User },
   { href: "/applications", label: "Applications", icon: FileText },
   { href: "/history", label: "Chat history", icon: History },

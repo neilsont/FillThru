@@ -1,5 +1,7 @@
 import { LoginForm } from "@/components/auth/login-form";
+import { safeNext } from "@/lib/utils";
 
-export default function LoginPage() {
-  return <LoginForm />;
+export default async function LoginPage({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
+  const { next } = await searchParams;
+  return <LoginForm next={safeNext(next)} />;
 }

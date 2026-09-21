@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
+import { HeroChat } from "@/components/chat/hero-chat";
 import { 
   Rocket, 
   FileText, 
@@ -33,6 +34,7 @@ export default async function HomePage() {
           </div>
           
           <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-muted-foreground">
+            <Link href={user ? "/chat" : "#chat"} className="hover:text-primary transition-colors">Chat</Link>
             <Link href="#features" className="hover:text-primary transition-colors">Features</Link>
             <Link href="#extension" className="hover:text-primary transition-colors">Extension</Link>
           </nav>
@@ -77,12 +79,17 @@ export default async function HomePage() {
             </h1>
             
             <p className="text-xl text-muted-foreground/90 mb-10 leading-relaxed max-w-2xl mx-auto stagger-1">
-              The only platform that combines a professional job tracker with a 
-              powerful AI browser extension to auto-fill applications and 
-              write tailored cover letters in seconds.
+              An AI copilot that knows your résumé, your applications, and your goals — 
+              plus a browser extension that fills applications and writes cover letters 
+              on any site.
             </p>
+
+            {/* ── Chat ─────────────────────────────────────────────────────── */}
+            <div className="mb-10 stagger-2">
+              <HeroChat isAuthed={Boolean(user)} />
+            </div>
             
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 stagger-2">
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 stagger-3">
               <Button size="lg" className="rounded-full px-8 h-12 text-base font-semibold shadow-xl shadow-primary/20 transition-all hover:scale-105" asChild>
                 <Link href={user ? "/dashboard" : "/signup"}>
                   {user ? "Go to Dashboard" : "Start your free 7-day trial"}

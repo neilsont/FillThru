@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { safeNext } from "@/lib/utils";
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
@@ -31,21 +32,25 @@ export async function updateSession(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname;
 
-  // Redirect unauthenticated users away from protected routes
-  const protectedRoutes = ["/dashboard", "/profile", "/applications", "/questions", "/history", "/onboarding"];
-  const isProtected = protectedRoutes.some((r) => pathname.startsWith(r));
+  // Redirect unauthenticated users away from protected routes, remembering
+  // where they were headed so sign-in can drop them back there.
+  const protectedRoutes = ["/dashboard", "/profile", "/applications", "/questions", "/history", "/onboarding", "/chat"];
+  const isProtected = protectedRoutes.some((r) => pathname === r || pathname.startsWith(r + "/"));
 
   if (!user && isProtected) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
+    url.search = "";
+    url.searchParams.set("next", pathname);
     return NextResponse.redirect(url);
   }
 
-  // Redirect authenticated users away from auth pages
+  // Redirect authenticated users away from auth pages (to `next` if it's a safe relative path)
   const authRoutes = ["/login", "/signup"];
   if (user && authRoutes.includes(pathname)) {
     const url = request.nextUrl.clone();
-    url.pathname = "/dashboard";
+    url.pathname = safeNext(request.nextUrl.searchParams.get("next"));
+    url.search = "";
     return NextResponse.redirect(url);
   }
 

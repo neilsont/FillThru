@@ -11,7 +11,12 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Loader2 } from "lucide-react";
 import { OAuthButtons } from "./oauth-buttons";
 
-export function LoginForm() {
+interface LoginFormProps {
+  /** Where to land after signing in (e.g. /chat when they typed into the landing-page chat bar). */
+  next?: string;
+}
+
+export function LoginForm({ next = "/dashboard" }: LoginFormProps) {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -32,7 +37,7 @@ export function LoginForm() {
         return;
       }
 
-      router.push("/dashboard");
+      router.push(next);
       router.refresh();
     } catch {
       setError("Something went wrong");
@@ -48,7 +53,7 @@ export function LoginForm() {
         <CardDescription>Sign in to your Fillthru account</CardDescription>
       </CardHeader>
       <CardContent className="pb-0 space-y-4">
-        <OAuthButtons next="/dashboard" />
+        <OAuthButtons next={next} />
         <div className="relative">
           <div className="absolute inset-0 flex items-center">
             <span className="w-full border-t border-border/60" />
@@ -99,7 +104,7 @@ export function LoginForm() {
           </Button>
           <p className="text-sm text-muted-foreground">
             Don&apos;t have an account?{" "}
-            <Link href="/signup" className="text-primary font-medium hover:underline">
+            <Link href={next === "/dashboard" ? "/signup" : `/signup?next=${encodeURIComponent(next)}`} className="text-primary font-medium hover:underline">
               Sign up
             </Link>
           </p>

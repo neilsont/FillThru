@@ -1,8 +1,10 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { ResumeDropzone } from "@/components/onboarding/resume-dropzone";
+import { safeNext } from "@/lib/utils";
 
-export default async function OnboardingPage() {
+export default async function OnboardingPage({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
+  const next = safeNext((await searchParams).next);
   const supabase = await createClient();
   const {
     data: { user },
@@ -20,8 +22,8 @@ export default async function OnboardingPage() {
     .single();
 
   if (resume) {
-    redirect("/dashboard");
+    redirect(next);
   }
 
-  return <ResumeDropzone />;
+  return <ResumeDropzone next={next} />;
 }

@@ -24,7 +24,12 @@ const ACCEPTED_TYPES = [
   "application/msword",
 ];
 
-export function ResumeDropzone() {
+interface ResumeDropzoneProps {
+  /** Where to go once the résumé is in (or skipped). */
+  next?: string;
+}
+
+export function ResumeDropzone({ next = "/dashboard" }: ResumeDropzoneProps) {
   const [step, setStep] = useState<UploadStep>("idle");
   const [dragOver, setDragOver] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -57,7 +62,7 @@ export function ResumeDropzone() {
         stepTimers.forEach(clearTimeout);
         setStep("done");
         toast({ title: "Resume uploaded!", description: "Your resume has been parsed successfully." });
-        setTimeout(() => router.push("/dashboard"), 1500);
+        setTimeout(() => router.push(next), 1500);
       } catch (err) {
         stepTimers.forEach(clearTimeout);
         const message = err instanceof Error ? err.message : "Something went wrong";
@@ -70,7 +75,7 @@ export function ResumeDropzone() {
         });
       }
     },
-    [uploadMutation, router, toast]
+    [uploadMutation, router, toast, next]
   );
 
   const handleDrop = useCallback(
@@ -169,7 +174,7 @@ export function ResumeDropzone() {
           <p className="text-xs text-muted-foreground">PDF or Word document (.pdf, .docx), max 10MB</p>
         </div>
         <div className="mt-4 text-center">
-          <Button variant="ghost" size="sm" onClick={() => router.push("/dashboard")}>
+          <Button variant="ghost" size="sm" onClick={() => router.push(next)}>
             Skip for now
           </Button>
         </div>

@@ -1,6 +1,5 @@
 export type AIModel =
   | "gemini-3.5-flash-lite"
-  | "openrouter/deepseek-v4-flash"
   | "openrouter/nemotron-3-super"
   | "openrouter/nemotron-3-ultra"
   | "gemini-3.5-flash"
@@ -29,8 +28,8 @@ export interface AIModelConfig {
 // Adding an OpenRouter model = one entry here. Probe it first with a strict-JSON
 // prompt; reasoning models need requestOptions.reasoning.enabled=false or their
 // hidden thinking eats the max_tokens budget and the JSON gets cut off.
-// Verified live 2026-09-19 — see git history for retired entries (Groq llama-3.3,
-// Qwen 3.6 Plus free, DeepSeek V4.1 Flash free).
+// Verified live 2026-09-20 — see git history for retired entries (Groq llama-3.3,
+// Qwen 3.6 Plus free, DeepSeek V4.1 Flash free, DeepSeek V4 Flash free).
 export const AI_MODELS: AIModelConfig[] = [
   {
     id: "gemini-3.5-flash-lite",
@@ -83,18 +82,6 @@ export const AI_MODELS: AIModelConfig[] = [
     free: true,
   },
   {
-    id: "openrouter/deepseek-v4-flash",
-    name: "DeepSeek V4 Flash",
-    provider: "openrouter",
-    remoteId: "deepseek/deepseek-v4-flash-0731:free",
-    providerLabel: "OpenRouter",
-    description: "DeepSeek's flash model on OpenRouter's free community tier (rate-limited).",
-    badge: "Free",
-    badgeVariant: "default",
-    color: "bg-purple-500",
-    free: true,
-  },
-  {
     id: "gpt-4o-mini",
     name: "GPT-4o Mini",
     provider: "openai",
@@ -122,11 +109,23 @@ export const AI_MODELS: AIModelConfig[] = [
 
 export const DEFAULT_MODEL: AIModel = "gemini-3.5-flash-lite";
 
+// The website chat optimises for time-to-first-token rather than strict JSON,
+// and Gemini's free tier can queue requests for tens of seconds; Nemotron on
+// OpenRouter answers in well under a second. Measured 2026-09-20.
+export const CHAT_DEFAULT_MODEL: AIModel = "openrouter/nemotron-3-ultra";
+export const CHAT_FALLBACK_ORDER: AIModel[] = [
+  "openrouter/nemotron-3-ultra",
+  "openrouter/nemotron-3-super",
+  "gemini-3.5-flash",
+  "gemini-3.5-flash-lite",
+];
+
 // IDs that used to exist. Browsers persist the user's pick in localStorage, so a
 // retired ID can keep arriving for a long time — map it to the closest live model.
 const LEGACY_MODEL_ALIASES: Record<string, AIModel> = {
   "groq/llama-3.3-70b-versatile": DEFAULT_MODEL,
-  "openrouter/qwen3.6-plus": "openrouter/deepseek-v4-flash",
+  "openrouter/qwen3.6-plus": "openrouter/nemotron-3-super",
+  "openrouter/deepseek-v4-flash": "openrouter/nemotron-3-super",
   "gemini-2.0-flash": "gemini-3.5-flash-lite",
   "gemini-2.5-flash": "gemini-3.5-flash",
   "gemini-2.5-flash-lite": "gemini-3.5-flash-lite",

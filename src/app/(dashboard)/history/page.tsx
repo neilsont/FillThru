@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { PageHeader } from "@/components/shared/page-header";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Button } from "@/components/ui/button";
@@ -8,7 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useChat, useChats, useDeleteChat } from "@/hooks/use-chats";
 import { useToast } from "@/components/ui/toast";
-import { ChevronLeft, MessageSquare, Paperclip, Trash2 } from "lucide-react";
+import { ChevronLeft, MessageSquare, MessagesSquare, Paperclip, Trash2 } from "lucide-react";
 
 function timeAgo(value: string | Date) {
   const diff = Date.now() - new Date(value).getTime();
@@ -29,9 +30,16 @@ function ConversationView({ chatId, onBack }: { chatId: string; onBack: () => vo
   }
   return (
     <div>
-      <Button variant="ghost" size="sm" className="mb-3 -ml-2" onClick={onBack}>
-        <ChevronLeft className="h-4 w-4 mr-1" /> All conversations
-      </Button>
+      <div className="mb-3 flex items-center justify-between">
+        <Button variant="ghost" size="sm" className="-ml-2" onClick={onBack}>
+          <ChevronLeft className="h-4 w-4 mr-1" /> All conversations
+        </Button>
+        {chat.host === "fillthru.com" && (
+          <Button size="sm" asChild>
+            <Link href={`/chat/${chat.chatId}`}><MessagesSquare className="h-3.5 w-3.5 mr-1.5" /> Continue in chat</Link>
+          </Button>
+        )}
+      </div>
       <Card className="border-border/60">
         <CardContent className="p-5">
           <div className="mb-4">
@@ -97,7 +105,9 @@ export default function HistoryPage() {
         <EmptyState
           icon={MessageSquare}
           title="No conversations yet"
-          description="Open Fillthru on any page (⌥F) and ask something. Conversations show up here so you can find them later or clear them."
+          description="Start a chat here on the website, or open Fillthru on any page (⌥F) and ask something. Conversations show up here so you can find them later or clear them."
+          actionLabel="Start a chat"
+          actionHref="/chat"
         />
       ) : (
         <div className="rounded-lg border border-border/60 bg-white divide-y divide-border/60">
