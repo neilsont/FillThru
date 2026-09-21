@@ -17,15 +17,21 @@ export async function POST() {
     .single();
 
   if (!sub?.stripe_customer_id) {
-    return NextResponse.json({ error: "No subscription found" }, { status: 404 });
+    return NextResponse.json({ error: "There's no billing account yet — subscribe first, then you can manage it here." }, { status: 404 });
   }
 
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL!;
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://fillthru.com";
 
-  const session = await getStripe().billingPortal.sessions.create({
-    customer: sub.stripe_customer_id,
-    return_url: `${baseUrl}/profile`,
-  });
-
-  return NextResponse.json({ url: session.url });
+  try {
+    const session = await getStripe().billingPortal.sessions.create({
+      customer: sub.stripe_customer_id,
+      return_url: `${baseUrl}/profile`,
+    });
+    return NextResponse.json({ url: session.url });
+  } catch (err) {
+    // Most likely: no Customer Portal configuration saved in the Stripe dashboard for this mode.
+    console.error("Stripe portal session failed:", err);
+    const message = err instanceof Error ? err.message : "Could not open the billing portal";
+    return NextResponse.json({ error: message }, { status: 502 });
+  }
 }

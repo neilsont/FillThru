@@ -41,7 +41,9 @@ export function PlanCard() {
   const yearly = formatPrice(prices.year);
   const yearlyPerMonth = prices.year ? formatPrice({ ...prices.year, amount: Math.round(prices.year.amount / 12) }) : null;
 
-  const subscribed = status?.reason === "subscription" || status?.reason === "admin";
+  const admin = status?.reason === "admin";
+  const subscribed = status?.reason === "subscription" || admin;
+  const canManageBilling = Boolean(status?.hasBilling);
   const trialing = status?.reason === "trial";
   const expired = status?.reason === "trial_expired" || status?.reason === "inactive";
 
@@ -53,7 +55,8 @@ export function PlanCard() {
             <CreditCard className="h-4 w-4" />
             Plan
           </CardTitle>
-          {!isLoading && subscribed && (
+          {!isLoading && admin && <Badge className="bg-primary text-[10px]">Admin</Badge>}
+          {!isLoading && subscribed && !admin && (
             <Badge className="bg-accent text-[10px]">Active{status?.planInterval ? ` · ${status.planInterval === "year" ? "Yearly" : "Monthly"}` : ""}</Badge>
           )}
           {!isLoading && trialing && (
@@ -66,7 +69,9 @@ export function PlanCard() {
           )}
         </div>
         <CardDescription className="text-xs">
-          {subscribed
+          {admin
+            ? "Owner account — everything is included, nothing to bill."
+            : subscribed
             ? `Everything is included. ${status?.currentPeriodEnd ? `Renews ${new Date(status.currentPeriodEnd).toLocaleDateString()}.` : ""}`
             : trialing
               ? "You have full access during your trial. Subscribe any time to keep it — you won't be charged until the trial ends."
@@ -75,9 +80,13 @@ export function PlanCard() {
       </CardHeader>
       <CardContent>
         {subscribed ? (
-          <Button variant="outline" size="sm" onClick={openPortal} disabled={portalLoading}>
-            {portalLoading ? "Opening…" : "Manage billing"}
-          </Button>
+          canManageBilling ? (
+            <Button variant="outline" size="sm" onClick={openPortal} disabled={portalLoading}>
+              {portalLoading ? "Opening…" : "Manage billing"}
+            </Button>
+          ) : (
+            <p className="text-xs text-muted-foreground">No billing account to manage.</p>
+          )
         ) : (
           <div className="grid gap-2 sm:grid-cols-2">
             <Button

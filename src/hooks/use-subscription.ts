@@ -13,6 +13,8 @@ export interface SubscriptionStatus {
   trialDaysLeft: number | null;
   currentPeriodEnd: string | null;
   planInterval: PlanInterval | null;
+  /** A Stripe customer exists, so "Manage billing" can open the portal. */
+  hasBilling?: boolean;
 }
 
 export function useSubscription() {

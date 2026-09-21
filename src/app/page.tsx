@@ -311,7 +311,7 @@ export default async function HomePage() {
             </nav>
 
             <p className="text-muted-foreground/40 text-xs font-medium">
-              Site Content &copy; 2026 Wilson Digital
+              &copy; 2026 Jicsaw LLC. All rights reserved.
             </p>
           </div>
         </footer>

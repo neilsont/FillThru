@@ -17,6 +17,8 @@ export interface Entitlement {
   trialEndsAt: string | null;
   currentPeriodEnd: string | null;
   planInterval: "month" | "year" | null;
+  /** True when a Stripe customer exists, i.e. the billing portal can open. */
+  hasBilling: boolean;
 }
 
 export function isPaidModel(model: AIModel | string): boolean {
@@ -43,6 +45,7 @@ interface SubscriptionRow {
   current_period_end: string | null;
   trial_ends_at: string | null;
   plan_interval: "month" | "year" | null;
+  stripe_customer_id?: string | null;
 }
 
 async function startTrial(userId: string): Promise<SubscriptionRow | null> {
@@ -55,31 +58,32 @@ async function startTrial(userId: string): Promise<SubscriptionRow | null> {
       { user_id: userId, status: "trialing", trial_ends_at: trialEndsAt, updated_at: new Date().toISOString() },
       { onConflict: "user_id", ignoreDuplicates: true } // never overwrite a row a webhook already wrote
     )
-    .select("status, current_period_end, trial_ends_at, plan_interval")
+    .select("status, current_period_end, trial_ends_at, plan_interval, stripe_customer_id")
     .maybeSingle();
-  return data ?? { status: "trialing", current_period_end: null, trial_ends_at: trialEndsAt, plan_interval: null };
+  return data ?? { status: "trialing", current_period_end: null, trial_ends_at: trialEndsAt, plan_interval: null, stripe_customer_id: null };
 }
 
 /**
  * Resolve what the user is entitled to. Starts the free trial on first call.
- * Pass `userEmail` whenever you have it so the admin bypass works without a DB round-trip.
+ * Pass `userEmail` whenever you have it so the admin bypass applies.
  */
 export async function getEntitlement(
   supabase: SupabaseClient,
   userId: string,
   userEmail?: string | null
 ): Promise<Entitlement> {
-  if (isAdminEmail(userEmail)) {
-    return { active: true, reason: "admin", status: "active", trialEndsAt: null, currentPeriodEnd: null, planInterval: null };
-  }
-
-  let { data: row } = await supabase
+  const { data: existing } = await supabase
     .from("user_subscriptions")
-    .select("status, current_period_end, trial_ends_at, plan_interval")
+    .select("status, current_period_end, trial_ends_at, plan_interval, stripe_customer_id")
     .eq("user_id", userId)
     .maybeSingle<SubscriptionRow>();
 
-  if (!row) row = await startTrial(userId);
+  if (isAdminEmail(userEmail)) {
+    // Admin bypasses the paywall; they may or may not also be a real Stripe customer.
+    return { active: true, reason: "admin", status: "active", trialEndsAt: null, currentPeriodEnd: null, planInterval: null, hasBilling: Boolean(existing?.stripe_customer_id) };
+  }
+
+  const row = existing ?? (await startTrial(userId));
 
   const now = Date.now();
   const periodOk = !row?.current_period_end || new Date(row.current_period_end).getTime() > now;
@@ -88,6 +92,7 @@ export async function getEntitlement(
     trialEndsAt: row?.trial_ends_at ?? null,
     currentPeriodEnd: row?.current_period_end ?? null,
     planInterval: row?.plan_interval ?? null,
+    hasBilling: Boolean(row?.stripe_customer_id),
   };
 
   if (row?.status === "active" && periodOk) {
