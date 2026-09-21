@@ -149,12 +149,12 @@ export default function FAQPage() {
             </div>
             <span className="font-bold text-primary">Fillthru</span>
           </Link>
-          <a
-            href="mailto:support@fillthru.com"
+          <Link
+            href="/support"
             className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors"
           >
-            Contact Support
-          </a>
+            Support
+          </Link>
         </div>
       </header>
 
